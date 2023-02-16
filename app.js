@@ -31,6 +31,13 @@ async function getProfiles (req, res) {
   var results= await queryDatabase("SELECT * FROM users");
   res.end(JSON.stringify({"status":"OK","result":results}));
 }
+app.post('/setup_payment',setupPayment)
+async function setupPayment (req, res) {
+  res.writeHead(200, { 'Content-Type': 'application/json' });
+  var token = uuidv4();
+  //var results= await queryDatabase("SELECT * FROM users");
+  res.end(JSON.stringify({"status":"OK","result":{"token":token}}));
+}
 
 // Perform a query to the database
 function queryDatabase (query) {
