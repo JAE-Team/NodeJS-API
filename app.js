@@ -14,7 +14,7 @@ function wait (ms) {
 const app = express()
 
 // Set port number
-const port = process.env.PORT || 3000
+const port = process.env.PORT || 3001
 
 // Publish static files from 'public' folder
 //app.use(express.static('public'))
@@ -24,11 +24,12 @@ const httpServer = app.listen(port, appListen)
 function appListen () {
   console.log(`Listening for HTTP queries on: http://localhost:${port}`)
 }
+//Get profiles endpoint
 app.post('/get_profiles',getProfiles)
 async function getProfiles (req, res) {
   res.writeHead(200, { 'Content-Type': 'application/json' });
   var results= await queryDatabase("SELECT * FROM users");
-  res.end(JSON.stringify({"status":"OK","message":results}));
+  res.end(JSON.stringify({"status":"OK","result":results}));
 }
 
 // Perform a query to the database
