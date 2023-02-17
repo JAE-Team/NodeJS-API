@@ -23,13 +23,12 @@ const port = process.env.PORT || 3001
 const httpServer = app.listen(port, appListen)
 function appListen () {
   console.log(`Listening for HTTP queries on: http://localhost:${port}`)
-
 }
 //Get profiles endpoint
 app.post('/get_profiles',getProfiles)
 async function getProfiles (req, res) {
   res.writeHead(200, { 'Content-Type': 'application/json' });
-  var results= await queryDatabase("SELECT * FROM users");
+  var results= await queryDatabase("SELECT * FROM users;");
   res.end(JSON.stringify({"status":"OK","result":results}));
 }
 
@@ -44,7 +43,7 @@ async function setupPayment (req, res) {
     let message;
 
     /* Comprobamos que el id de usuario existe */
-    let checkUserExists = queryDatabase ("SELECT * FROM users WHERE userId='"+userIdDestination+"'");
+    let checkUserExists = queryDatabase ("SELECT * FROM users WHERE userId='"+userIdDestination+"';");
     if(checkUserExists.length==0){
       message = "User not found in the database";
       /* El usuario de id existe, vamos a comprobar si la cantidad 
@@ -58,7 +57,7 @@ async function setupPayment (req, res) {
     }else{
       message = "Transaction correct";
       token = uuidv4();
-      queryDatabase("INSERT INTO transactions (token, userDestiny, accepted) VALUES ('"+token +", "+ userIdDestination +", false)");
+      queryDatabase("INSERT INTO transactions (token, userDestiny, accepted, timeSetup) VALUES ('"+token +", "+ userIdDestination +", false, "+ Date("YYYY-MM-DD hh:mm:ss") +")");
       //var results= await queryDatabase("SELECT * FROM users");
     }
       res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -78,21 +77,25 @@ async function startPayment (req, res) {
     let token = receivedPost.transaction_token;
     let userIdOrigin = receivedPost.user_id;
 
-    let status;
     let message;
     let transactionType;
-    let amount;
 
-    let resultQuery = await queryDatabase("SELECT * FROM transactions WHERE token='"+token+"'");
-    const isAccepted = await queryDatabase("SELECT accepted FROM transactions WHERE token='"+token+"'");
+    let resultQuery = await queryDatabase("SELECT * FROM transactions WHERE token='"+token+"';");
+    let isAccepted = await queryDatabase("SELECT accepted FROM transactions WHERE token='"+token+"';");
     if(resultQuery.length=0){
       message = "Transaction not found";
-      /* Comprobar si el token es de una transaccion ya aceptada (y por tanto finalizada)
-      Este codigo hay que testearlo */
-    }else if(isAccepted[0].accepted){
-      message = "Transaction already accepted";
-    };
+      /* Comprobar si el token no sea de una transaccion ya aceptada (y por tanto finalizada) */
+    }else if(isAccepted[0].accepted != 'waitingAcceptance'){
+      message = "Transaction repeated, can't be accepted";
+    }else{
+      message = "Transaction done correctly";
+    }
+
+    /* Necesitamos tener las fechas de setupPayment, startPayment y finisPayment para llevar un registro de cuanto tiempo
+    pasa entre cada parte de la transferencia */
+    queryDatabase("UPDATE transactions SET timeStart ="+ Date("YYYY-MM-DD hh:mm:ss") +"WHERE token ='"+ token+"';");
     res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({"status":"OK", "message":message, "transaction_type":transactionType, "amount":amount}));
   }catch(e){
     console.log("ERROR: " + e.stack)
   }
@@ -100,9 +103,32 @@ async function startPayment (req, res) {
 
 app.post('/finish_payment', getPayment)
 async function getPayment (req, res) {
-  res.writeHead(200, { 'Content-Type': 'application/json' });
-  let results;
-  res.end(JSON.stringify({"status":"OK","result":results}));
+  try{
+    let receivedPost = await post.getPostObject(req);
+
+    let userId = receivedPost.user_id;
+    let token = receivedPost.transaction_token;
+    let accept = receivedPost.accept;
+    let ammount = receivedPost.amount;
+    
+    let message;
+
+    if(accept){
+      if(amount>100){
+        queryDatabase("UPDATE transactions SET userDestiny ="+ userId +", ammount ="+ ammount +", accepted = "+ accepted+ ", timeFinish ="+ Date("YYYY-MM-DD hh:mm:ss") +"WHERE token ='"+ token+"';");
+        message = "Transaction accepted";
+      }else{
+        message = "Transaction rejected, the amount is not enough";
+      }
+    }else{
+      message = "Transaction rejected by the user";
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({"status":"OK", "message":message}));
+
+}catch(e){
+  console.log("ERROR: " + e.stack)
+}
 }
 
 function isValidNumber(str) {
