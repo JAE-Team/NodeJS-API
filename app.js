@@ -46,7 +46,7 @@ async function setupPayment (req, res) {
     let checkUserExists = queryDatabase ("SELECT * FROM users WHERE userId='"+userIdDestination+"';");
     if(checkUserExists.length==0){
       message = "User not found in the database";
-      /* El usuario de id existe, vamos a comprobar si la cantidad 
+      /* En caso contrario, el usuario de id existe, vamos a comprobar si la cantidad 
        esta en un formato numerico y es mayor que 0 (no tiene sentido una transferencia negativa) */
     }else if(isValidNumber(amount)==false){
       message = "Wrong ammount, not a valid number";
@@ -57,7 +57,7 @@ async function setupPayment (req, res) {
     }else{
       message = "Transaction correct";
       token = uuidv4();
-      queryDatabase("INSERT INTO transactions (token, userDestiny, accepted, timeSetup) VALUES ('"+token +", "+ userIdDestination +", false, "+ Date("YYYY-MM-DD hh:mm:ss") +")");
+      queryDatabase("INSERT INTO transactions (token, userDestiny, accepted, timeSetup) VALUES ('"+token +", "+ userIdDestination +", waitingAcceptance, "+ Date("YYYY-MM-DD hh:mm:ss") +")");
       //var results= await queryDatabase("SELECT * FROM users");
     }
       res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -84,14 +84,14 @@ async function startPayment (req, res) {
     let isAccepted = await queryDatabase("SELECT accepted FROM transactions WHERE token='"+token+"';");
     if(resultQuery.length=0){
       message = "Transaction not found";
-      /* Comprobar si el token no sea de una transaccion ya aceptada (y por tanto finalizada) */
+      /* Comprobar que el token no sea de una transaccion ya aceptada (y por tanto finalizada) */
     }else if(isAccepted[0].accepted != 'waitingAcceptance'){
       message = "Transaction repeated, can't be accepted";
     }else{
       message = "Transaction done correctly";
     }
 
-    /* Necesitamos tener las fechas de setupPayment, startPayment y finisPayment para llevar un registro de cuanto tiempo
+    /* Necesitamos tener las fechas de setupPayment, startPayment y finishPayment para llevar un registro de cuanto tiempo
     pasa entre cada parte de la transferencia */
     queryDatabase("UPDATE transactions SET timeStart ="+ Date("YYYY-MM-DD hh:mm:ss") +"WHERE token ='"+ token+"';");
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -112,15 +112,35 @@ async function getPayment (req, res) {
     let ammount = receivedPost.amount;
     
     let message;
+    let balancePayer;
 
+    /* Primero si la variable accept enviada a traves del post, booleana, es true, significa que el
+    usuario que tiene que pagar da el OK a la transaccion */
     if(accept){
-      if(amount>100){
-        queryDatabase("UPDATE transactions SET userDestiny ="+ userId +", ammount ="+ ammount +", accepted = "+ accepted+ ", timeFinish ="+ Date("YYYY-MM-DD hh:mm:ss") +"WHERE token ='"+ token+"';");
+      balancePayer = queryDatabase ("SELECT userBalance FROM users WHERE userId='"+userId+"';");
+      /*Comprobamos si el usuario tiene saldo suficiente para hacer la transferencia  */
+      if(amount>=balancePayer){
+        /* Registramos el resto de datos en la transferencia, 
+        ya sea que es aceptada, denegada pro falta de dinero o por el mismo usuario */
+        queryDatabase("UPDATE transactions SET userOrigin ="+ userId +", ammount ="+ ammount +", accepted = "+ "'acceptedByUser'"+ ", timeFinish ="+ Date("YYYY-MM-DD hh:mm:ss") +"WHERE token ='"+ token+"';");
+
+        /* Actualizamos el balance del usuario que paga */
+        queryDatabase("UPDATE users SET userBalance ="+ (balancePayer-amount) +"WHERE userId ='"+ userId+"';");
+        
+        /* Actualizamos el balance del usuario que recibe, primero debemos encontrar la id
+        del usuario receptor a partir del token de la transferencia y su saldo,
+        con esos datos lo actualizamos */
+        let userReceptorId = queryDatabase ("SELECT userDestiny FROM transactions WHERE token='"+token+"';");
+        let balanceReceptor = queryDatabase ("SELECT userBalance FROM users WHERE userId='"+userReceptorId+"';");
+
+        queryDatabase("UPDATE users SET userBalance ="+ (balanceReceptor+amount) +"WHERE userId ='"+ userReceptorId+"';");
         message = "Transaction accepted";
       }else{
-        message = "Transaction rejected, the amount is not enough";
+        queryDatabase("UPDATE transactions SET userOrigin ="+ userId +", ammount ="+ ammount +", accepted = "+ "'insufficient balance'"+ ", timeFinish ="+ Date("YYYY-MM-DD hh:mm:ss") +"WHERE token ='"+ token+"';");
+        message = "Transaction rejected, the user who pays doesn't have enough money";
       }
     }else{
+      queryDatabase("UPDATE transactions SET userOrigin ="+ userId +", ammount ="+ ammount +", accepted = "+ "'rejectedByUser'"+ ", timeFinish ="+ Date("YYYY-MM-DD hh:mm:ss") +"WHERE token ='"+ token+"';");
       message = "Transaction rejected by the user";
     }
     res.writeHead(200, { 'Content-Type': 'application/json' });
