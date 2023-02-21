@@ -176,7 +176,7 @@ async function startPayment (req, res) {
 
     let resultQuery = await queryDatabase("SELECT * FROM transactions WHERE token='"+token+"';");
     let status= resultQuery[0]["accepted"];
-    if(resultQuery.length=0){
+    if(resultQuery.length==0){
       message = "Transaction not found";
       /* Comprobar que el token no sea de una transaccion ya aceptada (y por tanto finalizada) */
     }else if(status != "waitingAcceptance"){
@@ -189,7 +189,7 @@ async function startPayment (req, res) {
     pasa entre cada parte de la transferencia */
     queryDatabase("UPDATE transactions SET timeStart ='"+ now +"' WHERE token ='"+ token+"';");
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({"status":"OK", "message":message, "transaction_type":transactionType, "amount":resultQuery.ammount}));
+    res.end(JSON.stringify({"status":"OK", "message":message, "transaction_type":transactionType, "amount":resultQuery[0]["ammount"]}));
   }catch(e){
     console.log("ERROR: " + e.stack)
   }
