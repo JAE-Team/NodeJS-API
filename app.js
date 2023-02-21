@@ -25,7 +25,7 @@ function appListen () {
   console.log(`Listening for HTTP queries on: http://localhost:${port}`)
 }
 //Get profiles endpoint
-app.post('/get_profiles',getProfiles)
+app.post('/api/get_profiles',getProfiles)
 async function getProfiles (req, res) {
   try{
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -38,7 +38,7 @@ async function getProfiles (req, res) {
 
 /* Parte de la spec 7, el usuario se logea y vamos a comprovar si ya existe, 
 de no ser asi lo añadimos a la BBDD */
-app.post('/signup',signup)
+app.post('/api/signup',signup)
 async function signup (req, res) {
   try{
 
@@ -78,7 +78,7 @@ async function signup (req, res) {
   }
 }
 
-app.post('/login',login)
+app.post('/api/login',login)
 async function login (req, res) {
   let receivedPost = await post.getPostObject(req);
   let message;
@@ -106,7 +106,7 @@ async function login (req, res) {
   res.end(JSON.stringify({"status":"OK", "message":message, "transaction_token":token}));
 }
 
-app.post('/logout',logout)
+app.post('/api/logout',logout)
 async function logout (req, res) {
 
   let receivedPost = await post.getPostObject(req);
@@ -125,14 +125,13 @@ async function logout (req, res) {
 
 }
 
-app.post('/setup_payment',setupPayment)
+app.post('/api/setup_payment',setupPayment)
 async function setupPayment (req, res) {
   try{
     /* Tenemos un post, de este post obtendremos el id de usuario y la cantidad */
     let receivedPost = await post.getPostObject(req);
     let userIdDestination = receivedPost.user_id;
     let amount = receivedPost.amount;
-
     var token;
     let message;
 
@@ -151,7 +150,8 @@ async function setupPayment (req, res) {
     }else{
       message = "Transaction correct";
       token = uuidv4();
-      queryDatabase("INSERT INTO transactions (token, userDestiny, accepted, timeSetup) VALUES ('"+token +", "+ userIdDestination +", waitingAcceptance, "+ Date("YYYY-MM-DD hh:mm:ss") +")");
+      let now=new Date().toJSON().slice(0, 10)
+      queryDatabase("INSERT INTO transactions (token, userDestiny, accepted, timeSetup) VALUES ('"+token +"', '"+ userIdDestination +"', 'waitingAcceptance', '"+ now +"')");
       //var results= await queryDatabase("SELECT * FROM users");
     }
       res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -163,7 +163,7 @@ async function setupPayment (req, res) {
 
 }
 
-app.post('/start_payment', startPayment)
+app.post('/api/start_payment', startPayment)
 async function startPayment (req, res) {
   try{
     let receivedPost = await post.getPostObject(req);
@@ -195,7 +195,7 @@ async function startPayment (req, res) {
   }
 }
 
-app.post('/finish_payment', getPayment)
+app.post('/api/finish_payment', getPayment)
 async function getPayment (req, res) {
   try{
     let receivedPost = await post.getPostObject(req);
@@ -245,17 +245,12 @@ async function getPayment (req, res) {
 }
 }
 
-function isValidNumber(str) {
-  // Check if the string contains only digits, optional minus sign, and optional decimal separator
-  const regex = /^-?\d+(\.\d+)?$/;
-  
-  // Check if the string matches the regex and is not empty
-  if (str && str.match(regex)) {
-    // Check if the decimal separator is correct (if present)
-    const decimalSeparator = (1.1).toLocaleString().replace(/\d/g, '');
-    return str.indexOf(decimalSeparator) === -1 || str.indexOf(decimalSeparator) === str.lastIndexOf(decimalSeparator);
+function isValidNumber(number) {
+  if(typeof number =="number"){
+    return true;
+  }else{
+    return false
   }
-  return false;
 }
 /* console.log(isValidNumber("135"));
 console.log(isValidNumber("45.678"));
