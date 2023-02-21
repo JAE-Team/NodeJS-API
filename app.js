@@ -276,13 +276,14 @@ function queryDatabase (query) {
       database: process.env.MYSQLDATABASE || "proyecto"
     });
 
-    var connection = mysql.createConnection({
+    /* Albert: Para hacer pruebas en local en mi PC */
+/*     var connection = mysql.createConnection({
       host: process.env.MYSQLHOST || "localhost",
       port: process.env.MYSQLPORT || 3306,
       user: process.env.MYSQLUSER || "root",
       password: process.env.MYSQLPASSWORD || "localhost",
-      database: process.env.MYSQLDATABASE || "proyecto"
-    });
+      database: process.env.MYSQLDATABASE || "ieticorn_database"
+    }); */
 
     connection.query(query, (error, results) => { 
       if (error) reject(error);
