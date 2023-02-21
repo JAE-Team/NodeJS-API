@@ -5,7 +5,7 @@ DROP TABLE IF EXISTS users;
 DROP TABLE IF EXISTS transacctions; 
 
 CREATE TABLE users(
-userId INTEGER PRIMARY KEY,
+phoneUser VARCHAR(30) PRIMARY KEY,
 userPassword VARCHAR(30),
 userName VARCHAR(30),
 userSurname VARCHAR(255),
@@ -19,8 +19,8 @@ de como puede terminar la transaccion */
 
 CREATE TABLE transactions(
 token VARCHAR(255) PRIMARY KEY,
-userOrigin INTEGER,
-userDestiny INTEGER,
+userOrigin VARCHAR(30),
+userDestiny VARCHAR(30),
 ammount DOUBLE,
 accepted ENUM('waitingAcceptance', 'acceptedByUser', 'rejectedByUser', 'insufficient balance', 'otherError'),
 timeSetup DATE,
@@ -33,7 +33,7 @@ CREATE TABLE users_transactions (
   users_userId INTEGER,
   transactions_token VARCHAR(255),
   roleUser ENUM('origin', 'destiny'),
-  FOREIGN KEY (users_userId) REFERENCES users (userId),
+  FOREIGN KEY (users_userId) REFERENCES users (phoneUser),
   FOREIGN KEY (transactions_token) REFERENCES transactions (token)
 );
 

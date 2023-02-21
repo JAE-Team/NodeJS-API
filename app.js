@@ -27,9 +27,102 @@ function appListen () {
 //Get profiles endpoint
 app.post('/get_profiles',getProfiles)
 async function getProfiles (req, res) {
-  res.writeHead(200, { 'Content-Type': 'application/json' });
+  try{
+    res.writeHead(200, { 'Content-Type': 'application/json' });
   var results= await queryDatabase("SELECT * FROM users;");
   res.end(JSON.stringify({"status":"OK","result":results}));
+  }catch(e){
+    console.log("ERROR: " + e.stack)
+  }
+}
+
+/* Parte de la spec 7, el usuario se logea y vamos a comprovar si ya existe, 
+de no ser asi lo añadimos a la BBDD */
+app.post('/signup',signup)
+async function signup (req, res) {
+  try{
+
+    /* La respuesta sera un post que ademas del status, nos dara un mensaje informativo 
+     Creo que aparte del mensaje, quizas tener una variable booleana que indique si la acción
+      se ha hecho o no sea mas sencillo que trabajar directamente con el mensaje */
+    let receivedPost = await post.getPostObject(req);
+    let message;
+    // let done = false;
+
+    let email = receivedPost.email;
+    let name = receivedPost.name;
+    let surname = receivedPost.surname;
+    let phone = receivedPost.phone;
+
+    /* De momento no pasaremos la contraseña por el post */
+    // let password = receivedPost.password;
+
+    let phoneSearch = queryDatabase ("SELECT * FROM users WHERE userPhone='"+phone+"';");
+
+    /* Si en la query encuentra algo, significa que ese num de telefono ya esta registrado */
+    if(phoneSearch.length>0){
+      message = "User already exists, new user can't be created";
+      // done = false;
+      /* En caso contrario, ese usuario no existe y lo crea */
+    }else{
+      // queryDatabase("INSERT INTO users (userEmail, userName, userSurname, userPhone, userPassword) VALUES ('"+email+"', '"+name+"', '"+surname+"', '"+phone+"', '"+password+"');");
+      queryDatabase("INSERT INTO users (userEmail, userName, userSurname, userPhone) VALUES ('"+email+"', '"+name+"', '"+surname+"', '"+phone+"');");
+      message = "User created correctly";
+      // done = true;
+    }
+
+    res.end(JSON.stringify({"status":"OK", "message":message}));
+    // res.end(JSON.stringify({"status":"OK", "message":message, "done":done}));
+  }catch(e){
+    console.log("ERROR: " + e.stack)
+  }
+}
+
+app.post('/login',login)
+async function login (req, res) {
+  let receivedPost = await post.getPostObject(req);
+  let message;
+
+  let email = receivedPost.email;
+  let password;
+  // let password = receivedPost.password;
+
+  emailSearch = queryDatabase ("SELECT * FROM users WHERE userEmail='"+email+"';");
+  passwordSearch = queryDatabase ("SELECT userPassword FROM users WHERE userEmail='"+password+"';");
+
+  if(emailSearch.length==1 && passwordSearch.length==1){
+    message = "Login correct, welcome!";
+  }else{
+    message = "Login failed";
+    if(emailSearch.length==0){
+      message = message +", the email is wrong";
+    }
+    if(passwordSearch.length==0){
+      message = message +", the password is wrong";
+    }
+    
+  }
+
+  res.end(JSON.stringify({"status":"OK", "message":message, "transaction_token":token}));
+}
+
+app.post('/logout',logout)
+async function logout (req, res) {
+
+  let receivedPost = await post.getPostObject(req);
+  let message
+
+  let sessionToken = receivedPost.session_token;
+
+  let sessionTokenSearch = queryDatabase ("SELECT * FROM sessions WHERE sessionToken='"+sessionToken+"';");
+  if (sessionTokenSearch.length==0){
+    message = "Logout failed, session token not found";
+  }else{
+    message = "Logout correct";
+  }
+
+  res.end(JSON.stringify({"status":"OK", "message":message}));
+
 }
 
 app.post('/setup_payment',setupPayment)
@@ -39,6 +132,7 @@ async function setupPayment (req, res) {
     let receivedPost = await post.getPostObject(req);
     let userIdDestination = receivedPost.user_id;
     let amount = receivedPost.amount;
+
     var token;
     let message;
 
@@ -179,6 +273,14 @@ function queryDatabase (query) {
       port: process.env.MYSQLPORT || 3306,
       user: process.env.MYSQLUSER || "root",
       password: process.env.MYSQLPASSWORD || "Persiana@1234",
+      database: process.env.MYSQLDATABASE || "proyecto"
+    });
+
+    var connection = mysql.createConnection({
+      host: process.env.MYSQLHOST || "localhost",
+      port: process.env.MYSQLPORT || 3306,
+      user: process.env.MYSQLUSER || "root",
+      password: process.env.MYSQLPASSWORD || "localhost",
       database: process.env.MYSQLDATABASE || "proyecto"
     });
 
