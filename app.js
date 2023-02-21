@@ -175,11 +175,11 @@ async function startPayment (req, res) {
     let transactionType;
 
     let resultQuery = await queryDatabase("SELECT * FROM transactions WHERE token='"+token+"';");
-    console.log(resultQuery[0]["accepted"])
+    let status= resultQuery[0]["accepted"];
     if(resultQuery.length=0){
       message = "Transaction not found";
       /* Comprobar que el token no sea de una transaccion ya aceptada (y por tanto finalizada) */
-    }else if(resultQuery[0]["accepted"] != 'waitingAcceptance'){
+    }else if(status != "waitingAcceptance"){
       message = "Transaction repeated, can't be accepted";
     }else{
       message = "Transaction done correctly";
