@@ -151,7 +151,7 @@ async function setupPayment (req, res) {
       message = "Transaction correct";
       token = uuidv4();
       let now=new Date().toJSON().slice(0, 10)
-      queryDatabase("INSERT INTO transactions (token, userDestiny, accepted, timeSetup) VALUES ('"+token +"', '"+ userIdDestination +"', 'waitingAcceptance', '"+ now +"')");
+      queryDatabase("INSERT INTO transactions (token, userDestiny,ammount, accepted, timeSetup) VALUES ('"+token +"', '"+ userIdDestination +"',"+amount+", 'waitingAcceptance', '"+ now +"')");
       //var results= await queryDatabase("SELECT * FROM users");
     }
       res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -175,21 +175,21 @@ async function startPayment (req, res) {
     let transactionType;
 
     let resultQuery = await queryDatabase("SELECT * FROM transactions WHERE token='"+token+"';");
-    let isAccepted = await queryDatabase("SELECT accepted FROM transactions WHERE token='"+token+"';");
+    console.log(resultQuery[0]["accepted"])
     if(resultQuery.length=0){
       message = "Transaction not found";
       /* Comprobar que el token no sea de una transaccion ya aceptada (y por tanto finalizada) */
-    }else if(isAccepted[0].accepted != 'waitingAcceptance'){
+    }else if(resultQuery[0]["accepted"] != 'waitingAcceptance'){
       message = "Transaction repeated, can't be accepted";
     }else{
       message = "Transaction done correctly";
     }
-
+    let now=new Date().toJSON().slice(0, 10)
     /* Necesitamos tener las fechas de setupPayment, startPayment y finishPayment para llevar un registro de cuanto tiempo
     pasa entre cada parte de la transferencia */
-    queryDatabase("UPDATE transactions SET timeStart ="+ Date("YYYY-MM-DD hh:mm:ss") +"WHERE token ='"+ token+"';");
+    queryDatabase("UPDATE transactions SET timeStart ='"+ now +"' WHERE token ='"+ token+"';");
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({"status":"OK", "message":message, "transaction_type":transactionType, "amount":amount}));
+    res.end(JSON.stringify({"status":"OK", "message":message, "transaction_type":transactionType, "amount":resultQuery.ammount}));
   }catch(e){
     console.log("ERROR: " + e.stack)
   }
@@ -264,11 +264,11 @@ function queryDatabase (query) {
 
   return new Promise((resolve, reject) => {
     var connection = mysql.createConnection({
-      host: process.env.MYSQLHOST || "localhost",
-      port: process.env.MYSQLPORT || 3306,
+      host: process.env.MYSQLHOST || "containers-us-west-138.railway.app",
+      port: process.env.MYSQLPORT || 6412,
       user: process.env.MYSQLUSER || "root",
-      password: process.env.MYSQLPASSWORD || "Persiana@1234",
-      database: process.env.MYSQLDATABASE || "proyecto"
+      password: process.env.MYSQLPASSWORD || "CG52zkHZxyzOTU0FcYEl",
+      database: process.env.MYSQLDATABASE || "railway"
     });
 
     /* Albert: Para hacer pruebas en local en mi PC */
