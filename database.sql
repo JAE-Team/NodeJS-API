@@ -5,12 +5,14 @@ DROP TABLE IF EXISTS users;
 DROP TABLE IF EXISTS transactions;
 
 CREATE TABLE users(
-userId VARCHAR(255) PRIMARY KEY,
-userPassword VARCHAR(255),
-userName VARCHAR(255),
-userSurname VARCHAR(255),
-userEmail VARCHAR(255),
-userBalance DOUBLE
+  id INTEGER(10) NOT NULL AUTO_INCREMENT,
+  userId VARCHAR(255),
+  userPassword VARCHAR(255),
+  userName VARCHAR(255),
+  userSurname VARCHAR(255),
+  userEmail VARCHAR(255),
+  userBalance DOUBLE,
+  PRIMARY KEY(id)
 );
 
 /* Segun ha especificado Enric, en principio accepted era sobre si el usuario aceptaba o no
@@ -30,10 +32,10 @@ timeFinish TIMESTAMP
 
 CREATE TABLE users_transactions (
   id INTEGER PRIMARY KEY AUTO_INCREMENT,
-  users_userId VARCHAR(225),
+  idUser INTEGER(10),
   transactions_token VARCHAR(255),
   roleUser ENUM('origin', 'destiny'),
-  FOREIGN KEY (users_userId) REFERENCES users (userId),
+  FOREIGN KEY (idUser) REFERENCES users (id),
   FOREIGN KEY (transactions_token) REFERENCES transactions (token)
 );
 
