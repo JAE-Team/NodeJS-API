@@ -54,20 +54,20 @@ async function signup (req, res) {
     let name = receivedPost.name;
     let surname = receivedPost.surname;
     let phone = receivedPost.phone;
+    let balance = receivedPost.balance;
 
     /* De momento no pasaremos la contraseña por el post */
     // let password = receivedPost.password;
 
-    let phoneSearch = queryDatabase ("SELECT * FROM users WHERE userPhone='"+phone+"';");
+    let phoneSearch = await queryDatabase ("SELECT * FROM users WHERE userId='"+phone+"';");
 
     /* Si en la query encuentra algo, significa que ese num de telefono ya esta registrado */
     if(phoneSearch.length>0){
-      message = "User already exists, new user can't be created";
-      // done = false;
-      /* En caso contrario, ese usuario no existe y lo crea */
+      message = "User already exists";
+      await queryDatabase("UPDATE users SET userName='"+ name + "', userSurname='" + surname + "' , userEmail='" + email + "', userBalance='"+balance+"' WHERE userId='"+phone+"';");
     }else{
       // queryDatabase("INSERT INTO users (userEmail, userName, userSurname, userPhone, userPassword) VALUES ('"+email+"', '"+name+"', '"+surname+"', '"+phone+"', '"+password+"');");
-      queryDatabase("INSERT INTO users (userEmail, userName, userSurname, userPhone) VALUES ('"+email+"', '"+name+"', '"+surname+"', '"+phone+"');");
+      queryDatabase("INSERT INTO users (userId, userName, userSurname, userEmail, userBalance) VALUES ('"+phone+"', '"+name+"', '"+surname+"', '"+email+"', '"+balance+"');");
       message = "User created correctly";
       // done = true;
     }
