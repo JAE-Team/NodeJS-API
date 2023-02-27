@@ -199,7 +199,6 @@ app.post('/api/finish_payment', getPayment)
 async function getPayment (req, res) {
   try{
     let receivedPost = await post.getPostObject(req);
-
     let userId = receivedPost.user_id;
     let token = receivedPost.transaction_token;
     let accept = receivedPost.accept;
@@ -229,7 +228,7 @@ async function getPayment (req, res) {
         console.log("SELECT userBalance FROM users WHERE userId='"+userReceptorId[0].userDestiny+"';");
         let balanceReceptor = await queryDatabase ("SELECT userBalance FROM users WHERE userId='"+userReceptorId[0].userDestiny+"';");
         console.log(balanceReceptor);
-        queryDatabase("UPDATE users SET userBalance ="+ (balanceReceptor[0].userBalance+ammount) +"WHERE userId ='"+ userReceptorId[0].userDestiny+"';");
+        queryDatabase("UPDATE users SET userBalance ="+ (balanceReceptor[0].userBalance+ammount) +" WHERE userId ='"+ userReceptorId[0].userDestiny+"';");
         message = "Transaction accepted";
         console.log("si");
       }else{
