@@ -204,37 +204,40 @@ async function getPayment (req, res) {
     let token = receivedPost.transaction_token;
     let accept = receivedPost.accept;
     let ammount = receivedPost.amount;
-    
+    let now=new Date().toJSON().slice(0, 10)
+
     let message;
     let balancePayer;
-
     /* Primero si la variable accept enviada a traves del post, booleana, es true, significa que el
     usuario que tiene que pagar da el OK a la transaccion */
     if(accept){
-      balancePayer = queryDatabase ("SELECT userBalance FROM users WHERE userId='"+userId+"';");
+      balancePayer = await queryDatabase ("SELECT userBalance FROM users WHERE userId='"+userId+"';");
+      console.log(balancePayer[0].userBalance)
       /*Comprobamos si el usuario tiene saldo suficiente para hacer la transferencia  */
-      if(amount>=balancePayer){
+      if(ammount<=balancePayer[0].userBalance){
         /* Registramos el resto de datos en la transferencia, 
         ya sea que es aceptada, denegada pro falta de dinero o por el mismo usuario */
-        queryDatabase("UPDATE transactions SET userOrigin ="+ userId +", ammount ="+ ammount +", accepted = "+ "'acceptedByUser'"+ ", timeFinish ="+ Date("YYYY-MM-DD hh:mm:ss") +"WHERE token ='"+ token+"';");
+        queryDatabase("UPDATE transactions SET userOrigin ="+ userId +", ammount ="+ ammount +", accepted = "+ "'acceptedByUser'"+ ", timeFinish ='"+ now +"' WHERE token ='"+ token+"';");
 
         /* Actualizamos el balance del usuario que paga */
-        queryDatabase("UPDATE users SET userBalance ="+ (balancePayer-amount) +"WHERE userId ='"+ userId+"';");
+        queryDatabase("UPDATE users SET userBalance ="+ (balancePayer[0].userBalance-ammount) +" WHERE userId ='"+ userId+"';");
         
         /* Actualizamos el balance del usuario que recibe, primero debemos encontrar la id
         del usuario receptor a partir del token de la transferencia y su saldo,
         con esos datos lo actualizamos */
-        let userReceptorId = queryDatabase ("SELECT userDestiny FROM transactions WHERE token='"+token+"';");
-        let balanceReceptor = queryDatabase ("SELECT userBalance FROM users WHERE userId='"+userReceptorId+"';");
-
-        queryDatabase("UPDATE users SET userBalance ="+ (balanceReceptor+amount) +"WHERE userId ='"+ userReceptorId+"';");
+        let userReceptorId = await queryDatabase ("SELECT userDestiny FROM transactions WHERE token='"+token+"';");
+        console.log("SELECT userBalance FROM users WHERE userId='"+userReceptorId[0].userDestiny+"';");
+        let balanceReceptor = await queryDatabase ("SELECT userBalance FROM users WHERE userId='"+userReceptorId[0].userDestiny+"';");
+        console.log(balanceReceptor);
+        queryDatabase("UPDATE users SET userBalance ="+ (balanceReceptor[0].userBalance+ammount) +"WHERE userId ='"+ userReceptorId[0].userDestiny+"';");
         message = "Transaction accepted";
+        console.log("si");
       }else{
-        queryDatabase("UPDATE transactions SET userOrigin ="+ userId +", ammount ="+ ammount +", accepted = "+ "'insufficient balance'"+ ", timeFinish ="+ Date("YYYY-MM-DD hh:mm:ss") +"WHERE token ='"+ token+"';");
+        queryDatabase("UPDATE transactions SET userOrigin ="+ userId +", ammount ="+ ammount +", accepted = "+ "'insufficient balance'"+ ", timeFinish ='"+ now +"' WHERE token ='"+ token+"';");
         message = "Transaction rejected, the user who pays doesn't have enough money";
       }
     }else{
-      queryDatabase("UPDATE transactions SET userOrigin ="+ userId +", ammount ="+ ammount +", accepted = "+ "'rejectedByUser'"+ ", timeFinish ="+ Date("YYYY-MM-DD hh:mm:ss") +"WHERE token ='"+ token+"';");
+      queryDatabase("UPDATE transactions SET userOrigin ="+ userId +", ammount ="+ ammount +", accepted = "+ "'rejectedByUser'"+ ", timeFinish ='"+ now +"' WHERE token ='"+ token+"';");
       message = "Transaction rejected by the user";
     }
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -264,10 +267,10 @@ function queryDatabase (query) {
 
   return new Promise((resolve, reject) => {
     var connection = mysql.createConnection({
-      host: process.env.MYSQLHOST || "containers-us-west-138.railway.app",
-      port: process.env.MYSQLPORT || 6412,
+      host: process.env.MYSQLHOST || "containers-us-west-193.railway.app",
+      port: process.env.MYSQLPORT || 7088,
       user: process.env.MYSQLUSER || "root",
-      password: process.env.MYSQLPASSWORD || "CG52zkHZxyzOTU0FcYEl",
+      password: process.env.MYSQLPASSWORD || "6KBLxGD9fTeYBRyxPB4U",
       database: process.env.MYSQLDATABASE || "railway"
     });
 
