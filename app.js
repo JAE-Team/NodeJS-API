@@ -30,10 +30,10 @@ async function getProfiles (req, res) {
   try{
     res.writeHead(200, { 'Content-Type': 'application/json' });
   var results= await queryDatabase("SELECT * FROM users;");
-  res.end(JSON.stringify({"status":"OK","result":results}));
+  res.end(JSON.stringify({"status":"OK","message":results}));
   }catch(e){
     console.log("ERROR: " + e.stack)
-    res.end(JSON.stringify({"status":"Error","result":"Failed to get the profiles"}));
+    res.end(JSON.stringify({"status":"Error","message":"Failed to get the profiles"}));
   }
 }
 
@@ -150,7 +150,7 @@ async function setupPayment (req, res) {
        guardamos transferencia en BBDD, aun no esta acceptada, el pagador tendra que aceptar */
     }else{
       message = "Transaction correct";
-      token = uuidv4();
+      token = "P-"+uuidv4();
       let now=getDate();
       console.log(now)
       queryDatabase("INSERT INTO transactions (token, userDestiny,ammount, accepted) VALUES ('"+token +"', '"+ userIdDestination +"',"+amount+", 'waitingAcceptance')");
@@ -169,31 +169,32 @@ app.post('/api/start_payment', startPayment)
 async function startPayment (req, res) {
   try{
     let receivedPost = await post.getPostObject(req);
+    const TOKEN = receivedPost.transaction_token;
+    let RESULT = {};
+    //let userIdOrigin = receivedPost.user_id; FUTURE IMPLEMENTATION
+    let resultQuery = await queryDatabase("SELECT * FROM transactions WHERE token='"+TOKEN+"';");
 
-    let token = receivedPost.transaction_token;
-    let userIdOrigin = receivedPost.user_id;
-
-    let message;
-    let transactionType;
-
-    let resultQuery = await queryDatabase("SELECT * FROM transactions WHERE token='"+token+"';");
-    let status= resultQuery[0]["accepted"];
     if(resultQuery.length==0){
       message = "Transaction not found";
+      RESULT={"status":"Error","message":message}
       /* Comprobar que el token no sea de una transaccion ya aceptada (y por tanto finalizada) */
-    }else if(status != "waitingAcceptance"){
+    }else if(resultQuery[0]["accepted"] != "waitingAcceptance"){
       message = "Transaction repeated, can't be accepted";
+      RESULT = {"status":"Error","message":message};
     }else{
       message = "Transaction done correctly";
+      RESULT={"status":"OK","message":message,"transaction_type":"Payment","amount":resultQuery[0]["ammount"]};
     }
-    let now=new Date().toLocaleString()
     /* Necesitamos tener las fechas de setupPayment, startPayment y finishPayment para llevar un registro de cuanto tiempo
     pasa entre cada parte de la transferencia */
-    queryDatabase("UPDATE transactions SET timeStart = NOW() WHERE token ='"+ token+"';");
+    queryDatabase("UPDATE transactions SET timeStart = NOW() WHERE token ='"+ TOKEN +"';");
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({"status":"OK", "message":message, "transaction_type":transactionType, "amount":resultQuery[0]["ammount"]}));
+    res.end(JSON.stringify(RESULT));
   }catch(e){
     console.log("ERROR: " + e.stack)
+    RESULT = {"status":"Error","message":"Transaction cannot be completed"};
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(RESULT));
   }
 }
 
