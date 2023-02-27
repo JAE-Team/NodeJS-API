@@ -23,9 +23,9 @@ userOrigin VARCHAR(255),
 userDestiny VARCHAR(255),
 ammount DOUBLE,
 accepted ENUM('waitingAcceptance', 'acceptedByUser', 'rejectedByUser', 'insufficient balance', 'otherError'),
-timeSetup DATE,
-timeStart DATE,
-timeFinish DATE
+timeSetup TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+timeStart TIMESTAMP,
+timeFinish TIMESTAMP
 );
 
 CREATE TABLE users_transactions (

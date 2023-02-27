@@ -150,8 +150,9 @@ async function setupPayment (req, res) {
     }else{
       message = "Transaction correct";
       token = uuidv4();
-      let now=new Date().toJSON().slice(0, 10)
-      queryDatabase("INSERT INTO transactions (token, userDestiny,ammount, accepted, timeSetup) VALUES ('"+token +"', '"+ userIdDestination +"',"+amount+", 'waitingAcceptance', '"+ now +"')");
+      let now=getDate();
+      console.log(now)
+      queryDatabase("INSERT INTO transactions (token, userDestiny,ammount, accepted) VALUES ('"+token +"', '"+ userIdDestination +"',"+amount+", 'waitingAcceptance')");
       //var results= await queryDatabase("SELECT * FROM users");
     }
       res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -184,10 +185,10 @@ async function startPayment (req, res) {
     }else{
       message = "Transaction done correctly";
     }
-    let now=new Date().toJSON().slice(0, 10)
+    let now=new Date().toLocaleString()
     /* Necesitamos tener las fechas de setupPayment, startPayment y finishPayment para llevar un registro de cuanto tiempo
     pasa entre cada parte de la transferencia */
-    queryDatabase("UPDATE transactions SET timeStart ='"+ now +"' WHERE token ='"+ token+"';");
+    queryDatabase("UPDATE transactions SET timeStart = NOW() WHERE token ='"+ token+"';");
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({"status":"OK", "message":message, "transaction_type":transactionType, "amount":resultQuery[0]["ammount"]}));
   }catch(e){
@@ -203,7 +204,6 @@ async function getPayment (req, res) {
     let token = receivedPost.transaction_token;
     let accept = receivedPost.accept;
     let ammount = receivedPost.amount;
-    let now=new Date().toJSON().slice(0, 10)
 
     let message;
     let balancePayer;
@@ -216,7 +216,7 @@ async function getPayment (req, res) {
       if(ammount<=balancePayer[0].userBalance){
         /* Registramos el resto de datos en la transferencia, 
         ya sea que es aceptada, denegada pro falta de dinero o por el mismo usuario */
-        queryDatabase("UPDATE transactions SET userOrigin ="+ userId +", ammount ="+ ammount +", accepted = "+ "'acceptedByUser'"+ ", timeFinish ='"+ now +"' WHERE token ='"+ token+"';");
+        queryDatabase("UPDATE transactions SET userOrigin ="+ userId +", ammount ="+ ammount +", accepted = "+ "'acceptedByUser'"+ ", timeFinish = NOW() WHERE token ='"+ token+"';");
 
         /* Actualizamos el balance del usuario que paga */
         queryDatabase("UPDATE users SET userBalance ="+ (balancePayer[0].userBalance-ammount) +" WHERE userId ='"+ userId+"';");
@@ -232,11 +232,11 @@ async function getPayment (req, res) {
         message = "Transaction accepted";
         console.log("si");
       }else{
-        queryDatabase("UPDATE transactions SET userOrigin ="+ userId +", ammount ="+ ammount +", accepted = "+ "'insufficient balance'"+ ", timeFinish ='"+ now +"' WHERE token ='"+ token+"';");
+        queryDatabase("UPDATE transactions SET userOrigin ="+ userId +", ammount ="+ ammount +", accepted = "+ "'insufficient balance'"+ ", timeFinish = NOW() WHERE token ='"+ token+"';");
         message = "Transaction rejected, the user who pays doesn't have enough money";
       }
     }else{
-      queryDatabase("UPDATE transactions SET userOrigin ="+ userId +", ammount ="+ ammount +", accepted = "+ "'rejectedByUser'"+ ", timeFinish ='"+ now +"' WHERE token ='"+ token+"';");
+      queryDatabase("UPDATE transactions SET userOrigin ="+ userId +", ammount ="+ ammount +", accepted = "+ "'rejectedByUser'"+ ", timeFinish = NOW() WHERE token ='"+ token+"';");
       message = "Transaction rejected by the user";
     }
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -260,6 +260,13 @@ console.log(isValidNumber("12,34"));
 console.log(isValidNumber("errr"));
 console.log(isValidNumber("df.h"));
 console.log(isValidNumber("123.4.5")); */
+
+function getDate(){
+  var now = new Date();
+  var formatedDate = now.getFullYear()+"/"+now.getMonth()+"/"+now.getDay()+" ";
+  formatedDate += now.getHours()+":"+now.getMinutes()+":"+now.getSeconds();
+  return formatedDate;
+}
 
 // Perform a query to the database
 function queryDatabase (query) {
