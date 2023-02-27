@@ -29,7 +29,7 @@ app.post('/api/get_profiles',getProfiles)
 async function getProfiles (req, res) {
   try{
     res.writeHead(200, { 'Content-Type': 'application/json' });
-  var results= await queryDatabase("SELECT * FsROM users;");
+  var results= await queryDatabase("SELECT * FROM users;");
   res.end(JSON.stringify({"status":"OK","result":results}));
   }catch(e){
     console.log("ERROR: " + e.stack)
