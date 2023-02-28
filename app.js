@@ -64,6 +64,7 @@ async function signup (req, res) {
     /* Si en la query encuentra algo, significa que ese num de telefono ya esta registrado */
     if(phoneSearch.length>0){
       message = "User already exists";
+      balance = await queryDatabase ("SELECT userBalance FROM users WHERE userId='"+phone+"';");
       await queryDatabase("UPDATE users SET userName='"+ name + "', userSurname='" + surname + "' , userEmail='" + email + "', userBalance='"+balance+"' WHERE userId='"+phone+"';");
     }else{
       // queryDatabase("INSERT INTO users (userEmail, userName, userSurname, userPhone, userPassword) VALUES ('"+email+"', '"+name+"', '"+surname+"', '"+phone+"', '"+password+"');");
