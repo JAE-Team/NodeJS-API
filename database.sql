@@ -12,6 +12,9 @@ CREATE TABLE users(
   userSurname VARCHAR(255),
   userEmail VARCHAR(255),
   userBalance DOUBLE,
+  userStatus VARCHAR(50) DEFAULT 'active',
+  lastStatusChange TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  sessionToken VARCHAR(255),
   PRIMARY KEY(id)
 );
 
@@ -28,6 +31,15 @@ accepted ENUM('waitingAcceptance', 'acceptedByUser', 'rejectedByUser', 'insuffic
 timeSetup TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 timeStart TIMESTAMP,
 timeFinish TIMESTAMP
+);
+
+CREATE TABLE users_transactions (
+  id INTEGER PRIMARY KEY AUTO_INCREMENT,
+  idUser INTEGER(10),
+  transactions_token VARCHAR(255),
+  roleUser ENUM('origin', 'destiny'),
+  FOREIGN KEY (idUser) REFERENCES users (id),
+  FOREIGN KEY (transactions_token) REFERENCES transactions (token)
 );
 
 INSERT INTO users (userId, userPassword, userName, userSurname, userEmail, userBalance)

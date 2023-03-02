@@ -4,6 +4,7 @@ const url = require('url')
 const mysql = require('mysql2')
 const post = require('./post.js')
 const { v4: uuidv4 } = require('uuid')
+const { response } = require('express')
 
 // Wait 'ms' milliseconds
 function wait (ms) {
@@ -37,6 +38,22 @@ async function getProfiles (req, res) {
   }
 }
 
+//Get profiles endpoint
+app.post('/api/get_profile',getProfile)
+async function getProfile (req, res) {
+  let receivedPost = await post.getPostObject(req);
+  console.log(receivedPost);
+  try{
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    var results= await queryDatabase("SELECT * FROM users WHERE userId="+receivedPost.userId+";");
+    results[0]["transactions"]=await queryDatabase("SELECT * FROM transactions WHERE userDestiny="+receivedPost.userId+";");
+    res.end(JSON.stringify({"status":"OK","message":results}));
+  }catch(e){
+    console.log("ERROR: " + e.stack)
+    res.end(JSON.stringify({"status":"Error","message":"Failed to get the profile"}));
+  }
+}
+
 /* Parte de la spec 7, el usuario se logea y vamos a comprovar si ya existe, 
 de no ser asi lo añadimos a la BBDD */
 app.post('/api/signup',signup)
@@ -50,14 +67,14 @@ async function signup (req, res) {
     let message;
     // let done = false;
 
-    let email = receivedPost.email;
-    let name = receivedPost.name;
-    let surname = receivedPost.surname;
-    let phone = receivedPost.phone;
-    let balance = receivedPost.balance;
+    let phone = receivedPost.userId;
+    let password = receivedPost.userPassword;
+    let email = receivedPost.userEmail;
+    let name = receivedPost.userName;
+    let surname = receivedPost.userSurname;
+    let balance = receivedPost.userBalance;
 
     /* De momento no pasaremos la contraseña por el post */
-    // let password = receivedPost.password;
 
     let phoneSearch = await queryDatabase ("SELECT * FROM users WHERE userId='"+phone+"';");
 
@@ -68,7 +85,7 @@ async function signup (req, res) {
       await queryDatabase("UPDATE users SET userName='"+ name + "', userSurname='" + surname + "' , userEmail='" + email + "', userBalance='"+balance+"' WHERE userId='"+phone+"';");
     }else{
       // queryDatabase("INSERT INTO users (userEmail, userName, userSurname, userPhone, userPassword) VALUES ('"+email+"', '"+name+"', '"+surname+"', '"+phone+"', '"+password+"');");
-      queryDatabase("INSERT INTO users (userId, userName, userSurname, userEmail, userBalance) VALUES ('"+phone+"', '"+name+"', '"+surname+"', '"+email+"', '"+balance+"');");
+      queryDatabase("INSERT INTO users (userId, userPassword, userName, userSurname, userEmail, userBalance) VALUES ('"+phone+"','"+password+"', '"+name+"', '"+surname+"', '"+email+"', '"+balance+"');");
       message = "User created correctly";
       // done = true;
     }
@@ -83,29 +100,27 @@ async function signup (req, res) {
 app.post('/api/login',login)
 async function login (req, res) {
   let receivedPost = await post.getPostObject(req);
-  let message;
-
-  let email = receivedPost.email;
-  let password;
+  let token = "ST-"+uuidv4();
+  let response={}
   // let password = receivedPost.password;
-
-  emailSearch = queryDatabase ("SELECT * FROM users WHERE userEmail='"+email+"';");
-  passwordSearch = queryDatabase ("SELECT userPassword FROM users WHERE userEmail='"+password+"';");
-
-  if(emailSearch.length==1 && passwordSearch.length==1){
-    message = "Login correct, welcome!";
+  let userSearch = await queryDatabase ("SELECT * FROM users WHERE userEmail='"+receivedPost.userEmail+"';");
+  //passwordSearch = queryDatabase ("SELECT userPassword FROM users WHERE userEmail='"+password+"';");
+  if(userSearch.length==1 && userSearch[0].userPassword===receivedPost.userPassword){
+    response["status"]="OK";
+    response["message"]="Login correcte!";
+    response["token"]=token;
+    await queryDatabase ("UPDATE users SET sessionToken='"+token+"' WHERE userEmail='"+receivedPost.userEmail+"';");
   }else{
-    message = "Login failed";
-    if(emailSearch.length==0){
-      message = message +", the email is wrong";
+    response["status"]="Error";
+    response["message"] = "No s'ha pogut iniciar sessió";
+    if(userSearch.length==0){
+      response["message"]+=", el email es incorrecte";
+    }else if(userSearch[0].userPassword!=receivedPost.userPassword){
+      response["message"]+=", la clau d'usuari es incorrecte";
     }
-    if(passwordSearch.length==0){
-      message = message +", the password is wrong";
-    }
-    
   }
 
-  res.end(JSON.stringify({"status":"OK", "message":message, "transaction_token":token}));
+  res.end(JSON.stringify(response));
 }
 
 app.post('/api/logout',logout)
@@ -116,7 +131,7 @@ async function logout (req, res) {
 
   let sessionToken = receivedPost.session_token;
 
-  let sessionTokenSearch = queryDatabase ("SELECT * FROM sessions WHERE sessionToken='"+sessionToken+"';");
+  let sessionTokenSearch = queryDatabase ("SELECT * FROM users WHERE sessionToken='"+sessionToken+"';");
   if (sessionTokenSearch.length==0){
     message = "Logout failed, session token not found";
   }else{
@@ -210,6 +225,7 @@ async function getPayment (req, res) {
 
     let message;
     let balancePayer;
+    await queryDatabase("SET autocommit = 0;");
     /* Primero si la variable accept enviada a traves del post, booleana, es true, significa que el
     usuario que tiene que pagar da el OK a la transaccion */
     if(accept){
@@ -242,6 +258,8 @@ async function getPayment (req, res) {
       queryDatabase("UPDATE transactions SET userOrigin ="+ userId +", ammount ="+ ammount +", accepted = "+ "'rejectedByUser'"+ ", timeFinish = NOW() WHERE token ='"+ token+"';");
       message = "Transaction rejected by the user";
     }
+    await queryDatabase("COMMIT;");
+    await queryDatabase("SET autocommit = 1;");
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({"status":"OK", "message":message}));
 
@@ -276,10 +294,10 @@ function queryDatabase (query) {
 
   return new Promise((resolve, reject) => {
     var connection = mysql.createConnection({
-      host: process.env.MYSQLHOST || "containers-us-west-193.railway.app",
-      port: process.env.MYSQLPORT || 7088,
+      host: process.env.MYSQLHOST || "containers-us-west-126.railway.app",
+      port: process.env.MYSQLPORT || 7100,
       user: process.env.MYSQLUSER || "root",
-      password: process.env.MYSQLPASSWORD || "6KBLxGD9fTeYBRyxPB4U",
+      password: process.env.MYSQLPASSWORD || "cPQE4SjhyzwlJJPi9rP2",
       database: process.env.MYSQLDATABASE || "railway"
     });
 
