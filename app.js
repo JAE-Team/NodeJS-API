@@ -67,14 +67,14 @@ async function signup (req, res) {
     let message;
     // let done = false;
 
-    let email = receivedPost.email;
-    let name = receivedPost.name;
-    let surname = receivedPost.surname;
-    let phone = receivedPost.phone;
-    let balance = receivedPost.balance;
+    let phone = receivedPost.userId;
+    let password = receivedPost.userPassword;
+    let email = receivedPost.userEmail;
+    let name = receivedPost.userName;
+    let surname = receivedPost.userSurname;
+    let balance = receivedPost.userBalance;
 
     /* De momento no pasaremos la contraseña por el post */
-    // let password = receivedPost.password;
 
     let phoneSearch = await queryDatabase ("SELECT * FROM users WHERE userId='"+phone+"';");
 
@@ -85,7 +85,7 @@ async function signup (req, res) {
       await queryDatabase("UPDATE users SET userName='"+ name + "', userSurname='" + surname + "' , userEmail='" + email + "', userBalance='"+balance+"' WHERE userId='"+phone+"';");
     }else{
       // queryDatabase("INSERT INTO users (userEmail, userName, userSurname, userPhone, userPassword) VALUES ('"+email+"', '"+name+"', '"+surname+"', '"+phone+"', '"+password+"');");
-      queryDatabase("INSERT INTO users (userId, userName, userSurname, userEmail, userBalance) VALUES ('"+phone+"', '"+name+"', '"+surname+"', '"+email+"', '"+balance+"');");
+      queryDatabase("INSERT INTO users (userId, userPassword, userName, userSurname, userEmail, userBalance) VALUES ('"+phone+"','"+password+"', '"+name+"', '"+surname+"', '"+email+"', '"+balance+"');");
       message = "User created correctly";
       // done = true;
     }
@@ -105,16 +105,18 @@ async function login (req, res) {
   // let password = receivedPost.password;
   let userSearch = await queryDatabase ("SELECT * FROM users WHERE userEmail='"+receivedPost.userEmail+"';");
   //passwordSearch = queryDatabase ("SELECT userPassword FROM users WHERE userEmail='"+password+"';");
-  if(userSearch.length==1){
+  if(userSearch.length==1 && userSearch[0].userPassword===receivedPost.userPassword){
     response["status"]="OK";
-    response["message"]="Login correct, welcome!";
+    response["message"]="Login correcte!";
     response["token"]=token;
     await queryDatabase ("UPDATE users SET sessionToken='"+token+"' WHERE userEmail='"+receivedPost.userEmail+"';");
   }else{
     response["status"]="Error";
-    response["message"] = "Login failed";
+    response["message"] = "No s'ha pogut iniciar sessió";
     if(userSearch.length==0){
-      response["message"]+=", the email is wrong";
+      response["message"]+=", el email es incorrecte";
+    }else if(userSearch[0].userPassword!=receivedPost.userPassword){
+      response["message"]+=", la clau d'usuari es incorrecte";
     }
   }
 
@@ -129,7 +131,7 @@ async function logout (req, res) {
 
   let sessionToken = receivedPost.session_token;
 
-  let sessionTokenSearch = queryDatabase ("SELECT * FROM sessions WHERE sessionToken='"+sessionToken+"';");
+  let sessionTokenSearch = queryDatabase ("SELECT * FROM users WHERE sessionToken='"+sessionToken+"';");
   if (sessionTokenSearch.length==0){
     message = "Logout failed, session token not found";
   }else{
