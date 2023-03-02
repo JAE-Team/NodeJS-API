@@ -12,6 +12,9 @@ CREATE TABLE users(
   userSurname VARCHAR(255),
   userEmail VARCHAR(255),
   userBalance DOUBLE,
+  userStatus VARCHAR(50) DEFAULT 'active',
+  lastStatusChange TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  sessionToken VARCHAR(255),
   PRIMARY KEY(id)
 );
 
