@@ -33,15 +33,6 @@ timeStart TIMESTAMP,
 timeFinish TIMESTAMP
 );
 
-CREATE TABLE users_transactions (
-  id INTEGER PRIMARY KEY AUTO_INCREMENT,
-  idUser INTEGER(10),
-  transactions_token VARCHAR(255),
-  roleUser ENUM('origin', 'destiny'),
-  FOREIGN KEY (idUser) REFERENCES users (id),
-  FOREIGN KEY (transactions_token) REFERENCES transactions (token)
-);
-
 INSERT INTO users (userId, userPassword, userName, userSurname, userEmail, userBalance)
 VALUES ('+34600700800', 'contrasenya1', 'John', 'Doe', 'johndoe@example.com', 100.0);
 
