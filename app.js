@@ -54,6 +54,24 @@ async function getProfile (req, res) {
   }
 }
 
+/* Para cargar las transacciones de un usuario
+A este post hay que pasarle la id-telefono de un usuario y nos debe devolver
+un json con todas las transaciones
+cada transaccion deberia ser un json, para poderse leer mas facilmente en la app de escritorio */
+app.post('/api/get_transactions',getTransactions)
+async function getTransactions (req, res) {
+  let receivedPost = await post.getPostObject(req);
+  console.log(receivedPost);
+  try{
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    var results= await queryDatabase("SELECT * FROM transactions WHERE userDestiny="+receivedPost.userId+";");
+    res.end(JSON.stringify({"status":"OK","message":results}));
+  }catch(e){
+    console.log("ERROR: " + e.stack)
+    res.end(JSON.stringify({"status":"Error","message":"Failed to get the transactions"}));
+  }
+}
+
 /* Parte de la spec 7, el usuario se logea y vamos a comprovar si ya existe, 
 de no ser asi lo añadimos a la BBDD */
 app.post('/api/signup',signup)

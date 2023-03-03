@@ -1,6 +1,5 @@
 /* Este script es solo para crear la BBDD inicial y tenerla con perfiles de prueba */
 
-DROP TABLE IF EXISTS users_transactions;
 DROP TABLE IF EXISTS users;
 DROP TABLE IF EXISTS transactions;
 
