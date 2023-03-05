@@ -28,8 +28,6 @@ function appListen () {
 //Get profiles endpoint
 app.post('/api/get_profiles',getProfiles)
 async function getProfiles (req, res) {
-  console.log("get profiles: "+ receivedPost);
-  res.writeHead(200, { 'Content-Type': 'application/json' });
   try{
     res.writeHead(200, { 'Content-Type': 'application/json' });
     var results= await queryDatabase("SELECT * FROM users;");
