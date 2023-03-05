@@ -66,7 +66,12 @@ async function getTransactions (req, res) {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     // var resultName = await queryDatabase("SELECT userName, userSurname FROM USERS WHERE userId="+receivedPost.userId+";");
     // var results= await queryDatabase("SELECT DISTINCT t.*, u.userName FROM transactions t INNER JOIN users u ON t.userDestiny = u.userId OR t.userOrigin = u.userId WHERE userDestiny="+receivedPost.userId+" OR userOrigin="+receivedPost.userId+";");
-    var results= await queryDatabase("SELECT DISTINCT t.*, u.userName FROM transactions t INNER JOIN users u ON t.userOrigin = u.userId OR t.userDestiny = u.userId  WHERE (userDestiny="+receivedPost.userId+" OR userOrigin= "+receivedPost.userId+") AND u.userName = (SELECT userName FROM users WHERE userId =123);");
+    var results= await queryDatabase("SELECT transactions.*, usersO.userName AS originName, usersD.userName AS destinyName"
+    +", usersO.userSurname AS originSurname,  usersD.userSurname AS destinySurname"
+    +" FROM transactions"
+    +" LEFT JOIN users AS usersO ON transactions.userOrigin = usersO.userId"
+    +" LEFT JOIN users AS usersD ON transactions.userDestiny = usersD.userId"
+    +" WHERE (userOrigin = "+receivedPost.userId+" OR userDestiny = "+receivedPost.userId+");");
     res.end(JSON.stringify({"status":"OK","message":results}));
   }catch(e){
     console.log("ERROR: " + e.stack)
