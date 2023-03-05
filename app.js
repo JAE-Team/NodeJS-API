@@ -30,8 +30,8 @@ app.post('/api/get_profiles',getProfiles)
 async function getProfiles (req, res) {
   try{
     res.writeHead(200, { 'Content-Type': 'application/json' });
-  var results= await queryDatabase("SELECT * FROM users;");
-  res.end(JSON.stringify({"status":"OK","message":results}));
+    var results= await queryDatabase("SELECT * FROM users;");
+    res.end(JSON.stringify({"status":"OK","message":results}));
   }catch(e){
     console.log("ERROR: " + e.stack)
     res.end(JSON.stringify({"status":"Error","message":"Failed to get the profiles"}));
@@ -41,30 +41,15 @@ async function getProfiles (req, res) {
 //Get profiles endpoint
 app.post('/api/get_profile',getProfile)
 async function getProfile (req, res) {
-  let receivedPost = await post.getPostObject(req);
-  console.log(receivedPost);
-  try{
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    var results = await queryDatabase("SELECT * FROM users WHERE userId=" + receivedPost.userId + ";");
-    results[0]["transactions"]=await queryDatabase("SELECT * FROM transactions WHERE userDestiny="+receivedPost.userId+";");
-    res.end(JSON.stringify({"status":"OK","message":results}));
-  }catch(e){
-    console.log("ERROR: " + e.stack)
-    res.end(JSON.stringify({"status":"Error","message":"Failed to get the profile"}));
-  }
-}
+  res.writeHead(200, { 'Content-Type': 'application/json' });
 
-//Get profiles endpoint
-app.post('/api/get_profileAPP',getProfile)
-async function getProfile (req, res) {
   let receivedPost = await post.getPostObject(req);
-  try{
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    var results = await queryDatabase("SELECT * FROM users WHERE sessionToken=" + receivedPost.sessionToken + ";");
+  if((await queryDatabase("SELECT * FROM users WHERE sessionToken='" + receivedPost.sessionToken + "';")).length > 0){
+    var results = await queryDatabase("SELECT * FROM users WHERE sessionToken='" + receivedPost.sessionToken + "';");
     console.log(results);
-    res.end(JSON.stringify({"status":"OK","result":results}));
-  }catch(e){
-    console.log("ERROR: " + e.stack)
+    res.end(JSON.stringify({"status":"OK","message":results}));
+  } else {
+    console.log(receivedPost.sessionToken);
     res.end(JSON.stringify({"status":"Error","message":"Failed to get the profile"}));
   }
 }
@@ -327,10 +312,10 @@ function queryDatabase (query) {
 
   return new Promise((resolve, reject) => {
     var connection = mysql.createConnection({
-      host: process.env.MYSQLHOST || "containers-us-west-126.railway.app",
-      port: process.env.MYSQLPORT || 7100,
+      host: process.env.MYSQLHOST || "containers-us-west-167.railway.app",
+      port: process.env.MYSQLPORT || 7210,
       user: process.env.MYSQLUSER || "root",
-      password: process.env.MYSQLPASSWORD || "cPQE4SjhyzwlJJPi9rP2",
+      password: process.env.MYSQLPASSWORD || "j7YboDzy5yIdT6F8FRei",
       database: process.env.MYSQLDATABASE || "railway"
     });
 
