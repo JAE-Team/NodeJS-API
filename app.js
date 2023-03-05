@@ -28,6 +28,8 @@ function appListen () {
 //Get profiles endpoint
 app.post('/api/get_profiles',getProfiles)
 async function getProfiles (req, res) {
+  console.log("get profiles: "+ receivedPost);
+  res.writeHead(200, { 'Content-Type': 'application/json' });
   try{
     res.writeHead(200, { 'Content-Type': 'application/json' });
     var results= await queryDatabase("SELECT * FROM users;");
@@ -64,7 +66,8 @@ async function getTransactions (req, res) {
   console.log(receivedPost);
   try{
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    var results= await queryDatabase("SELECT * FROM transactions WHERE userDestiny="+receivedPost.userId+";");
+    // var resultName = await queryDatabase("SELECT userName, userSurname FROM USERS WHERE userId="+receivedPost.userId+";");
+    var results= await queryDatabase("SELECT t.*, u.userName FROM transactions t INNER JOIN users u ON t.userId WHERE userDestiny="+receivedPost.userId+" OR userOrigin="+receivedPost.userId+";");
     res.end(JSON.stringify({"status":"OK","message":results}));
   }catch(e){
     console.log("ERROR: " + e.stack)
