@@ -65,7 +65,8 @@ async function getTransactions (req, res) {
   try{
     res.writeHead(200, { 'Content-Type': 'application/json' });
     // var resultName = await queryDatabase("SELECT userName, userSurname FROM USERS WHERE userId="+receivedPost.userId+";");
-    var results= await queryDatabase("SELECT t.*, u.userName FROM transactions t INNER JOIN users u ON t.userId WHERE userDestiny="+receivedPost.userId+" OR userOrigin="+receivedPost.userId+";");
+    // var results= await queryDatabase("SELECT DISTINCT t.*, u.userName FROM transactions t INNER JOIN users u ON t.userDestiny = u.userId OR t.userOrigin = u.userId WHERE userDestiny="+receivedPost.userId+" OR userOrigin="+receivedPost.userId+";");
+    var results= await queryDatabase("SELECT DISTINCT t.*, u.userName FROM transactions t INNER JOIN users u ON t.userOrigin = u.userId OR t.userDestiny = u.userId  WHERE (userDestiny="+receivedPost.userId+" OR userOrigin= "+receivedPost.userId+") AND u.userName = (SELECT userName FROM users WHERE userId =123);");
     res.end(JSON.stringify({"status":"OK","message":results}));
   }catch(e){
     console.log("ERROR: " + e.stack)
