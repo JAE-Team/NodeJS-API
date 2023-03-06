@@ -83,14 +83,14 @@ async function getTransactions (req, res) {
 de no ser asi lo añadimos a la BBDD */
 app.post('/api/signup',signup)
 async function signup (req, res) {
-  try{
+  try {
 
     /* La respuesta sera un post que ademas del status, nos dara un mensaje informativo 
      Creo que aparte del mensaje, quizas tener una variable booleana que indique si la acción
       se ha hecho o no sea mas sencillo que trabajar directamente con el mensaje */
     let receivedPost = await post.getPostObject(req);
     let message;
-    let token = "ST-"+uuidv4();
+    let token = "ST-" + uuidv4();
     // let done = false;
 
     let phone = receivedPost.userId;
@@ -102,18 +102,23 @@ async function signup (req, res) {
 
     /* De momento no pasaremos la contraseña por el post */
 
-    let phoneSearch = await queryDatabase ("SELECT * FROM users WHERE userId='"+phone+"';");
+    let phoneSearch = await queryDatabase("SELECT * FROM users WHERE userId='" + phone + "';");
 
     /* Si en la query encuentra algo, significa que ese num de telefono ya esta registrado */
-    if(phoneSearch.length>0){
+    if (phoneSearch.length > 0) {
       message = "User already exists";
-      balance = await queryDatabase ("SELECT userBalance FROM users WHERE userId='"+phone+"';");
-      await queryDatabase("UPDATE users SET userName='"+ name + "', userSurname='" + surname + "' , userEmail='" + email + "', userBalance='"+balance+"' WHERE userId='"+phone+"';");
-    }else{
-      // queryDatabase("INSERT INTO users (userEmail, userName, userSurname, userPhone, userPassword) VALUES ('"+email+"', '"+name+"', '"+surname+"', '"+phone+"', '"+password+"');");
+      balance = await queryDatabase("SELECT userBalance FROM users WHERE userId='" + phone + "';");
+      await queryDatabase("UPDATE users SET userName='" + name + "', userSurname='" + surname + "' , userEmail='" + email + "', userBalance='" + balance + "' WHERE userId='" + phone + "';");
+    } else if (!email.match(/^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/)) {
+      message = "Format of email incorrect";
+
+    } else if ((await queryDatabase("SELECT * FROM users WHERE userEmail='" + email + "';")).length == 1) {
+      message = "Email already in use";
+    } else if (phone.toString().length < 9) {
+      message = "Format of phone incorrect";
+    } else {
       queryDatabase("INSERT INTO users (userId, userPassword, userName, userSurname, userEmail, userBalance, sessionToken) VALUES ('"+phone+"','"+password+"', '"+name+"', '"+surname+"', '"+email+"', '"+balance+"', '"+token+"');");
       message = "Usuari creat satisfactoriament";
-      // done = true;
     }
 
     res.end(JSON.stringify({"status":"OK", "message":message, "token":token}));
