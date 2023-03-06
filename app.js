@@ -90,6 +90,7 @@ async function signup (req, res) {
       se ha hecho o no sea mas sencillo que trabajar directamente con el mensaje */
     let receivedPost = await post.getPostObject(req);
     let message;
+    let token = "ST-"+uuidv4();
     // let done = false;
 
     let phone = receivedPost.userId;
@@ -110,12 +111,12 @@ async function signup (req, res) {
       await queryDatabase("UPDATE users SET userName='"+ name + "', userSurname='" + surname + "' , userEmail='" + email + "', userBalance='"+balance+"' WHERE userId='"+phone+"';");
     }else{
       // queryDatabase("INSERT INTO users (userEmail, userName, userSurname, userPhone, userPassword) VALUES ('"+email+"', '"+name+"', '"+surname+"', '"+phone+"', '"+password+"');");
-      queryDatabase("INSERT INTO users (userId, userPassword, userName, userSurname, userEmail, userBalance) VALUES ('"+phone+"','"+password+"', '"+name+"', '"+surname+"', '"+email+"', '"+balance+"');");
+      queryDatabase("INSERT INTO users (userId, userPassword, userName, userSurname, userEmail, userBalance, sessionToken) VALUES ('"+phone+"','"+password+"', '"+name+"', '"+surname+"', '"+email+"', '"+balance+"', '"+token+"');");
       message = "User created correctly";
       // done = true;
     }
 
-    res.end(JSON.stringify({"status":"OK", "message":message}));
+    res.end(JSON.stringify({"status":"OK", "message":message, "token":token}));
     // res.end(JSON.stringify({"status":"OK", "message":message, "done":done}));
   }catch(e){
     console.log("ERROR: " + e.stack)
