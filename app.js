@@ -112,7 +112,7 @@ async function signup (req, res) {
     }else{
       // queryDatabase("INSERT INTO users (userEmail, userName, userSurname, userPhone, userPassword) VALUES ('"+email+"', '"+name+"', '"+surname+"', '"+phone+"', '"+password+"');");
       queryDatabase("INSERT INTO users (userId, userPassword, userName, userSurname, userEmail, userBalance, sessionToken) VALUES ('"+phone+"','"+password+"', '"+name+"', '"+surname+"', '"+email+"', '"+balance+"', '"+token+"');");
-      message = "User created correctly";
+      message = "Usuari creat satisfactoriament";
       // done = true;
     }
 
@@ -157,11 +157,13 @@ async function logout (req, res) {
 
   let sessionToken = receivedPost.session_token;
 
-  let sessionTokenSearch = queryDatabase ("SELECT * FROM users WHERE sessionToken='"+sessionToken+"';");
-  if (sessionTokenSearch.length==0){
-    message = "Logout failed, session token not found";
-  }else{
+  let sessionTokenSearch = queryDatabase("SELECT * FROM users WHERE sessionToken='" + sessionToken + "';");
+  
+  if (sessionTokenSearch.length != 0) {
+    await queryDatabase ("UPDATE users SET sessionToken='' WHERE userId='"+receivedPost.userId+"';");
     message = "Logout correct";
+  }else{
+    message = "Logout failed, session token not found";
   }
 
   res.end(JSON.stringify({"status":"OK", "message":message}));
@@ -181,7 +183,7 @@ async function setupPayment (req, res) {
     /* Comprobamos que el id de usuario existe */
     let checkUserExists = queryDatabase ("SELECT * FROM users WHERE userId='"+userIdDestination+"';");
     if(checkUserExists.length==0){
-      message = "User not found in the database";
+      message = "Usuari no existeix a la base de dades";
       /* En caso contrario, el usuario de id existe, vamos a comprobar si la cantidad 
        esta en un formato numerico y es mayor que 0 (no tiene sentido una transferencia negativa) */
     }else if(isValidNumber(amount)==false){
@@ -191,7 +193,7 @@ async function setupPayment (req, res) {
       /* Si se cumplen las condiciones, todo Ok, creamos token
        guardamos transferencia en BBDD, aun no esta acceptada, el pagador tendra que aceptar */
     }else{
-      message = "Transaction correct";
+      message = "Token de transacció generat";
       token = "P-"+uuidv4();
       let now=getDate();
       console.log(now)
@@ -217,11 +219,11 @@ async function startPayment (req, res) {
     let resultQuery = await queryDatabase("SELECT * FROM transactions WHERE token='"+TOKEN+"';");
 
     if(resultQuery.length==0){
-      message = "Transaction not found";
+      message = "Transacció no trobada";
       RESULT={"status":"Error","message":message}
       /* Comprobar que el token no sea de una transaccion ya aceptada (y por tanto finalizada) */
     }else if(resultQuery[0]["accepted"] != "waitingAcceptance"){
-      message = "Transaction repeated, can't be accepted";
+      message = "Transacció repetida, no pot ser acceptada";
       RESULT = {"status":"Error","message":message};
     }else{
       message = "Transaction done correctly";
@@ -234,7 +236,7 @@ async function startPayment (req, res) {
     res.end(JSON.stringify(RESULT));
   }catch(e){
     console.log("ERROR: " + e.stack)
-    RESULT = {"status":"Error","message":"Transaction cannot be completed"};
+    RESULT = {"status":"Error","message":"Transacció no pot ser completada"};
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(RESULT));
   }
@@ -274,15 +276,15 @@ async function getPayment (req, res) {
         let balanceReceptor = await queryDatabase ("SELECT userBalance FROM users WHERE userId='"+userReceptorId[0].userDestiny+"';");
         console.log(balanceReceptor);
         queryDatabase("UPDATE users SET userBalance ="+ (balanceReceptor[0].userBalance+ammount) +" WHERE userId ='"+ userReceptorId[0].userDestiny+"';");
-        message = "Transaction accepted";
+        message = "Transacció aceptada";
         console.log("si");
       }else{
         queryDatabase("UPDATE transactions SET userOrigin ="+ userId +", ammount ="+ ammount +", accepted = "+ "'insufficient balance'"+ ", timeFinish = NOW() WHERE token ='"+ token+"';");
-        message = "Transaction rejected, the user who pays doesn't have enough money";
+        message = "Transacció rebutjada, el usuari que está pagant no té suficient sou";
       }
     }else{
       queryDatabase("UPDATE transactions SET userOrigin ="+ userId +", ammount ="+ ammount +", accepted = "+ "'rejectedByUser'"+ ", timeFinish = NOW() WHERE token ='"+ token+"';");
-      message = "Transaction rejected by the user";
+      message = "Transacció reutjada per l'usuari";
     }
     await queryDatabase("COMMIT;");
     await queryDatabase("SET autocommit = 1;");
