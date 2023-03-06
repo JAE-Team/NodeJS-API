@@ -91,6 +91,7 @@ async function signup (req, res) {
     let receivedPost = await post.getPostObject(req);
     let message;
     let token = "ST-" + uuidv4();
+    let response={}
     // let done = false;
 
     let phone = receivedPost.userId;
@@ -106,22 +107,31 @@ async function signup (req, res) {
 
     /* Si en la query encuentra algo, significa que ese num de telefono ya esta registrado */
     if (phoneSearch.length > 0) {
-      message = "User already exists";
+      response["status"]="KO";
+      response["message"]="Usuari ja existeix";
       balance = await queryDatabase("SELECT userBalance FROM users WHERE userId='" + phone + "';");
-      await queryDatabase("UPDATE users SET userName='" + name + "', userSurname='" + surname + "' , userEmail='" + email + "', userBalance='" + balance + "' WHERE userId='" + phone + "';");
-    } else if (!email.match(/^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/)) {
-      message = "Format of email incorrect";
+      await queryDatabase("UPDATE users SET userName='" + name + "', userSurname='" + surname + "' , userEmail='" + email + "', userBalance=" + balance + " WHERE userId='" + phone + "';");
 
     } else if ((await queryDatabase("SELECT * FROM users WHERE userEmail='" + email + "';")).length == 1) {
-      message = "Email already in use";
+      response["status"]="KO";
+      response["message"]="Email ja existeix";
+      
     } else if (phone.toString().length < 9) {
-      message = "Format of phone incorrect";
+      response["status"]="KO";
+      response["message"] = "Format incorrecte de teléfon";
+      
+    } else if (!checkEmail(email)) {
+      response["status"]="KO";
+      response["message"] = "Format incorrecte de correu";
+      
     } else {
       queryDatabase("INSERT INTO users (userId, userPassword, userName, userSurname, userEmail, userBalance, sessionToken) VALUES ('"+phone+"','"+password+"', '"+name+"', '"+surname+"', '"+email+"', '"+balance+"', '"+token+"');");
-      message = "Usuari creat satisfactoriament";
+      response["status"]="OK";
+      response["message"] = "Usuari creat satisfactoriament";
+      response["token"] = token;
     }
 
-    res.end(JSON.stringify({"status":"OK", "message":message, "token":token}));
+    res.end(JSON.stringify(response));
     // res.end(JSON.stringify({"status":"OK", "message":message, "done":done}));
   }catch(e){
     console.log("ERROR: " + e.stack)
@@ -321,6 +331,12 @@ function getDate(){
   formatedDate += now.getHours()+":"+now.getMinutes()+":"+now.getSeconds();
   return formatedDate;
 }
+
+function checkEmail(str){
+  var filter = /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+  return filter.test(str);
+}
+
 
 // Perform a query to the database
 function queryDatabase (query) {
