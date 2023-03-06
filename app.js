@@ -4,6 +4,7 @@ const url = require('url')
 const mysql = require('mysql2')
 const post = require('./post.js')
 const { v4: uuidv4 } = require('uuid')
+const { response } = require('express')
 
 // Wait 'ms' milliseconds
 function wait (ms) {
@@ -29,11 +30,52 @@ app.post('/api/get_profiles',getProfiles)
 async function getProfiles (req, res) {
   try{
     res.writeHead(200, { 'Content-Type': 'application/json' });
-  var results= await queryDatabase("SELECT * FROM users;");
-  res.end(JSON.stringify({"status":"OK","message":results}));
+    var results= await queryDatabase("SELECT * FROM users;");
+    res.end(JSON.stringify({"status":"OK","message":results}));
   }catch(e){
     console.log("ERROR: " + e.stack)
     res.end(JSON.stringify({"status":"Error","message":"Failed to get the profiles"}));
+  }
+}
+
+//Get profiles endpoint
+app.post('/api/get_profile',getProfile)
+async function getProfile (req, res) {
+  res.writeHead(200, { 'Content-Type': 'application/json' });
+
+  let receivedPost = await post.getPostObject(req);
+  if((await queryDatabase("SELECT * FROM users WHERE sessionToken='" + receivedPost.sessionToken + "';")).length > 0){
+    var results = await queryDatabase("SELECT * FROM users WHERE sessionToken='" + receivedPost.sessionToken + "';");
+    console.log(results);
+    res.end(JSON.stringify({"status":"OK","message":results}));
+  } else {
+    console.log(receivedPost.sessionToken);
+    res.end(JSON.stringify({"status":"Error","message":"Failed to get the profile"}));
+  }
+}
+
+/* Para cargar las transacciones de un usuario
+A este post hay que pasarle la id-telefono de un usuario y nos debe devolver
+un json con todas las transaciones
+cada transaccion deberia ser un json, para poderse leer mas facilmente en la app de escritorio */
+app.post('/api/get_transactions',getTransactions)
+async function getTransactions (req, res) {
+  let receivedPost = await post.getPostObject(req);
+  console.log(receivedPost);
+  try{
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    // var resultName = await queryDatabase("SELECT userName, userSurname FROM USERS WHERE userId="+receivedPost.userId+";");
+    // var results= await queryDatabase("SELECT DISTINCT t.*, u.userName FROM transactions t INNER JOIN users u ON t.userDestiny = u.userId OR t.userOrigin = u.userId WHERE userDestiny="+receivedPost.userId+" OR userOrigin="+receivedPost.userId+";");
+    var results= await queryDatabase("SELECT transactions.*, usersO.userName AS originName, usersD.userName AS destinyName"
+    +", usersO.userSurname AS originSurname,  usersD.userSurname AS destinySurname"
+    +" FROM transactions"
+    +" LEFT JOIN users AS usersO ON transactions.userOrigin = usersO.userId"
+    +" LEFT JOIN users AS usersD ON transactions.userDestiny = usersD.userId"
+    +" WHERE (userOrigin = "+receivedPost.userId+" OR userDestiny = "+receivedPost.userId+");");
+    res.end(JSON.stringify({"status":"OK","message":results}));
+  }catch(e){
+    console.log("ERROR: " + e.stack)
+    res.end(JSON.stringify({"status":"Error","message":"Failed to get the transactions"}));
   }
 }
 
@@ -41,38 +83,55 @@ async function getProfiles (req, res) {
 de no ser asi lo añadimos a la BBDD */
 app.post('/api/signup',signup)
 async function signup (req, res) {
-  try{
+  try {
 
     /* La respuesta sera un post que ademas del status, nos dara un mensaje informativo 
      Creo que aparte del mensaje, quizas tener una variable booleana que indique si la acción
       se ha hecho o no sea mas sencillo que trabajar directamente con el mensaje */
     let receivedPost = await post.getPostObject(req);
     let message;
+    let token = "ST-" + uuidv4();
+    let response={}
     // let done = false;
 
-    let email = receivedPost.email;
-    let name = receivedPost.name;
-    let surname = receivedPost.surname;
-    let phone = receivedPost.phone;
-    let balance = receivedPost.balance;
+    let phone = receivedPost.userId;
+    let password = receivedPost.userPassword;
+    let email = receivedPost.userEmail;
+    let name = receivedPost.userName;
+    let surname = receivedPost.userSurname;
+    let balance = receivedPost.userBalance;
 
     /* De momento no pasaremos la contraseña por el post */
-    // let password = receivedPost.password;
 
-    let phoneSearch = await queryDatabase ("SELECT * FROM users WHERE userId='"+phone+"';");
+    let phoneSearch = await queryDatabase("SELECT * FROM users WHERE userId='" + phone + "';");
 
     /* Si en la query encuentra algo, significa que ese num de telefono ya esta registrado */
-    if(phoneSearch.length>0){
-      message = "User already exists";
-      await queryDatabase("UPDATE users SET userName='"+ name + "', userSurname='" + surname + "' , userEmail='" + email + "', userBalance='"+balance+"' WHERE userId='"+phone+"';");
-    }else{
-      // queryDatabase("INSERT INTO users (userEmail, userName, userSurname, userPhone, userPassword) VALUES ('"+email+"', '"+name+"', '"+surname+"', '"+phone+"', '"+password+"');");
-      queryDatabase("INSERT INTO users (userId, userName, userSurname, userEmail, userBalance) VALUES ('"+phone+"', '"+name+"', '"+surname+"', '"+email+"', '"+balance+"');");
-      message = "User created correctly";
-      // done = true;
+    if (phoneSearch.length > 0) {
+      response["status"]="KO";
+      response["message"]="Usuari ja existeix";
+      balance = await queryDatabase("SELECT userBalance FROM users WHERE userId='" + phone + "';");
+      await queryDatabase("UPDATE users SET userName='" + name + "', userSurname='" + surname + "' , userEmail='" + email + "', userBalance=" + balance + " WHERE userId='" + phone + "';");
+
+    } else if ((await queryDatabase("SELECT * FROM users WHERE userEmail='" + email + "';")).length == 1) {
+      response["status"]="KO";
+      response["message"]="Email ja existeix";
+      
+    } else if (phone.toString().length < 9) {
+      response["status"]="KO";
+      response["message"] = "Format incorrecte de teléfon";
+      
+    } else if (!checkEmail(email)) {
+      response["status"]="KO";
+      response["message"] = "Format incorrecte de correu";
+      
+    } else {
+      queryDatabase("INSERT INTO users (userId, userPassword, userName, userSurname, userEmail, userBalance, sessionToken) VALUES ('"+phone+"','"+password+"', '"+name+"', '"+surname+"', '"+email+"', '"+balance+"', '"+token+"');");
+      response["status"]="OK";
+      response["message"] = "Usuari creat satisfactoriament";
+      response["token"] = token;
     }
 
-    res.end(JSON.stringify({"status":"OK", "message":message}));
+    res.end(JSON.stringify(response));
     // res.end(JSON.stringify({"status":"OK", "message":message, "done":done}));
   }catch(e){
     console.log("ERROR: " + e.stack)
@@ -82,29 +141,27 @@ async function signup (req, res) {
 app.post('/api/login',login)
 async function login (req, res) {
   let receivedPost = await post.getPostObject(req);
-  let message;
-
-  let email = receivedPost.email;
-  let password;
+  let token = "ST-"+uuidv4();
+  let response={}
   // let password = receivedPost.password;
-
-  emailSearch = queryDatabase ("SELECT * FROM users WHERE userEmail='"+email+"';");
-  passwordSearch = queryDatabase ("SELECT userPassword FROM users WHERE userEmail='"+password+"';");
-
-  if(emailSearch.length==1 && passwordSearch.length==1){
-    message = "Login correct, welcome!";
+  let userSearch = await queryDatabase ("SELECT * FROM users WHERE userEmail='"+receivedPost.userEmail+"';");
+  //passwordSearch = queryDatabase ("SELECT userPassword FROM users WHERE userEmail='"+password+"';");
+  if(userSearch.length==1 && userSearch[0].userPassword===receivedPost.userPassword){
+    response["status"]="OK";
+    response["message"]="Login correcte!";
+    response["token"]=token;
+    await queryDatabase ("UPDATE users SET sessionToken='"+token+"' WHERE userEmail='"+receivedPost.userEmail+"';");
   }else{
-    message = "Login failed";
-    if(emailSearch.length==0){
-      message = message +", the email is wrong";
+    response["status"]="Error";
+    response["message"] = "No s'ha pogut iniciar sessió";
+    if(userSearch.length==0){
+      response["message"]+=", el email es incorrecte";
+    }else if(userSearch[0].userPassword!=receivedPost.userPassword){
+      response["message"]+=", la clau d'usuari es incorrecte";
     }
-    if(passwordSearch.length==0){
-      message = message +", the password is wrong";
-    }
-    
   }
 
-  res.end(JSON.stringify({"status":"OK", "message":message, "transaction_token":token}));
+  res.end(JSON.stringify(response));
 }
 
 app.post('/api/logout',logout)
@@ -115,11 +172,13 @@ async function logout (req, res) {
 
   let sessionToken = receivedPost.session_token;
 
-  let sessionTokenSearch = queryDatabase ("SELECT * FROM sessions WHERE sessionToken='"+sessionToken+"';");
-  if (sessionTokenSearch.length==0){
-    message = "Logout failed, session token not found";
-  }else{
+  let sessionTokenSearch = queryDatabase("SELECT * FROM users WHERE sessionToken='" + sessionToken + "';");
+  
+  if (sessionTokenSearch.length != 0) {
+    await queryDatabase ("UPDATE users SET sessionToken='' WHERE userId='"+receivedPost.userId+"';");
     message = "Logout correct";
+  }else{
+    message = "Logout failed, session token not found";
   }
 
   res.end(JSON.stringify({"status":"OK", "message":message}));
@@ -139,7 +198,7 @@ async function setupPayment (req, res) {
     /* Comprobamos que el id de usuario existe */
     let checkUserExists = queryDatabase ("SELECT * FROM users WHERE userId='"+userIdDestination+"';");
     if(checkUserExists.length==0){
-      message = "User not found in the database";
+      message = "Usuari no existeix a la base de dades";
       /* En caso contrario, el usuario de id existe, vamos a comprobar si la cantidad 
        esta en un formato numerico y es mayor que 0 (no tiene sentido una transferencia negativa) */
     }else if(isValidNumber(amount)==false){
@@ -149,7 +208,7 @@ async function setupPayment (req, res) {
       /* Si se cumplen las condiciones, todo Ok, creamos token
        guardamos transferencia en BBDD, aun no esta acceptada, el pagador tendra que aceptar */
     }else{
-      message = "Transaction correct";
+      message = "Token de transacció generat";
       token = "P-"+uuidv4();
       let now=getDate();
       console.log(now)
@@ -175,11 +234,11 @@ async function startPayment (req, res) {
     let resultQuery = await queryDatabase("SELECT * FROM transactions WHERE token='"+TOKEN+"';");
 
     if(resultQuery.length==0){
-      message = "Transaction not found";
+      message = "Transacció no trobada";
       RESULT={"status":"Error","message":message}
       /* Comprobar que el token no sea de una transaccion ya aceptada (y por tanto finalizada) */
     }else if(resultQuery[0]["accepted"] != "waitingAcceptance"){
-      message = "Transaction repeated, can't be accepted";
+      message = "Transacció repetida, no pot ser acceptada";
       RESULT = {"status":"Error","message":message};
     }else{
       message = "Transaction done correctly";
@@ -192,7 +251,7 @@ async function startPayment (req, res) {
     res.end(JSON.stringify(RESULT));
   }catch(e){
     console.log("ERROR: " + e.stack)
-    RESULT = {"status":"Error","message":"Transaction cannot be completed"};
+    RESULT = {"status":"Error","message":"Transacció no pot ser completada"};
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(RESULT));
   }
@@ -209,6 +268,7 @@ async function getPayment (req, res) {
 
     let message;
     let balancePayer;
+    await queryDatabase("SET autocommit = 0;");
     /* Primero si la variable accept enviada a traves del post, booleana, es true, significa que el
     usuario que tiene que pagar da el OK a la transaccion */
     if(accept){
@@ -231,16 +291,18 @@ async function getPayment (req, res) {
         let balanceReceptor = await queryDatabase ("SELECT userBalance FROM users WHERE userId='"+userReceptorId[0].userDestiny+"';");
         console.log(balanceReceptor);
         queryDatabase("UPDATE users SET userBalance ="+ (balanceReceptor[0].userBalance+ammount) +" WHERE userId ='"+ userReceptorId[0].userDestiny+"';");
-        message = "Transaction accepted";
+        message = "Transacció aceptada";
         console.log("si");
       }else{
         queryDatabase("UPDATE transactions SET userOrigin ="+ userId +", ammount ="+ ammount +", accepted = "+ "'insufficient balance'"+ ", timeFinish = NOW() WHERE token ='"+ token+"';");
-        message = "Transaction rejected, the user who pays doesn't have enough money";
+        message = "Transacció rebutjada, el usuari que está pagant no té suficient sou";
       }
     }else{
       queryDatabase("UPDATE transactions SET userOrigin ="+ userId +", ammount ="+ ammount +", accepted = "+ "'rejectedByUser'"+ ", timeFinish = NOW() WHERE token ='"+ token+"';");
-      message = "Transaction rejected by the user";
+      message = "Transacció reutjada per l'usuari";
     }
+    await queryDatabase("COMMIT;");
+    await queryDatabase("SET autocommit = 1;");
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({"status":"OK", "message":message}));
 
@@ -270,15 +332,21 @@ function getDate(){
   return formatedDate;
 }
 
+function checkEmail(str){
+  var filter = /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+  return filter.test(str);
+}
+
+
 // Perform a query to the database
 function queryDatabase (query) {
 
   return new Promise((resolve, reject) => {
     var connection = mysql.createConnection({
-      host: process.env.MYSQLHOST || "containers-us-west-193.railway.app",
-      port: process.env.MYSQLPORT || 7088,
+      host: process.env.MYSQLHOST || "containers-us-west-167.railway.app",
+      port: process.env.MYSQLPORT || 7210,
       user: process.env.MYSQLUSER || "root",
-      password: process.env.MYSQLPASSWORD || "6KBLxGD9fTeYBRyxPB4U",
+      password: process.env.MYSQLPASSWORD || "j7YboDzy5yIdT6F8FRei",
       database: process.env.MYSQLDATABASE || "railway"
     });
 

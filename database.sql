@@ -1,6 +1,5 @@
 /* Este script es solo para crear la BBDD inicial y tenerla con perfiles de prueba */
 
-DROP TABLE IF EXISTS users_transactions;
 DROP TABLE IF EXISTS users;
 DROP TABLE IF EXISTS transactions;
 
@@ -12,6 +11,9 @@ CREATE TABLE users(
   userSurname VARCHAR(255),
   userEmail VARCHAR(255),
   userBalance DOUBLE,
+  userStatus VARCHAR(50) DEFAULT 'active',
+  lastStatusChange TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  sessionToken VARCHAR(255),
   PRIMARY KEY(id)
 );
 
@@ -30,15 +32,6 @@ timeStart TIMESTAMP,
 timeFinish TIMESTAMP
 );
 
-CREATE TABLE users_transactions (
-  id INTEGER PRIMARY KEY AUTO_INCREMENT,
-  idUser INTEGER(10),
-  transactions_token VARCHAR(255),
-  roleUser ENUM('origin', 'destiny'),
-  FOREIGN KEY (idUser) REFERENCES users (id),
-  FOREIGN KEY (transactions_token) REFERENCES transactions (token)
-);
-
 INSERT INTO users (userId, userPassword, userName, userSurname, userEmail, userBalance)
 VALUES ('+34600700800', 'contrasenya1', 'John', 'Doe', 'johndoe@example.com', 100.0);
 
@@ -48,8 +41,5 @@ VALUES ('+34600450500', '1q2w3e4r', 'Jack', 'Sparrow', 'jsparrow@pirate.com', 10
 INSERT INTO users (userId, userPassword, userName, userSurname, userEmail, userBalance)
 VALUES ('+34200300', 'nopassword', 'Obi Wan', 'Kenobi', 'obiwKenobi@jedi.com', 100.0);
 
-/* CREATE TABLE users(
-id INTEGER PRIMARY KEY AUTO_INCREMENT,
-userID VARCHAR(9)
-); */
+
 
