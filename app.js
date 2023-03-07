@@ -185,6 +185,23 @@ async function logout (req, res) {
 
 }
 
+app.post('/api/send_id',logout)
+async function logout (req, res) {
+
+  let receivedPost = await post.getPostObject(req);
+  let anversDNI = receivedPost.anvers;
+  let reversDNI = receivedPost.revers;
+
+  if (receivedPost.type == "uploadFile") {
+    console.log(anversDNI);
+    console.log(reversDNI);
+  }
+
+  
+  res.end(JSON.stringify({"status":"OK"}));
+
+}
+
 app.post('/api/setup_payment',setupPayment)
 async function setupPayment (req, res) {
   try{
@@ -343,11 +360,11 @@ function queryDatabase (query) {
 
   return new Promise((resolve, reject) => {
     var connection = mysql.createConnection({
-      host: process.env.MYSQLHOST || "containers-us-west-167.railway.app",
-      port: process.env.MYSQLPORT || 7210,
+      host: process.env.MYSQLHOST || "localhost",
+      port: process.env.MYSQLPORT || 3306,
       user: process.env.MYSQLUSER || "root",
-      password: process.env.MYSQLPASSWORD || "j7YboDzy5yIdT6F8FRei",
-      database: process.env.MYSQLDATABASE || "railway"
+      password: process.env.MYSQLPASSWORD || "password",
+      database: process.env.MYSQLDATABASE || "proyecto2"
     });
 
     /* Albert: Para hacer pruebas en local en mi PC */
