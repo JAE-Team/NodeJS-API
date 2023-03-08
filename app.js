@@ -185,7 +185,7 @@ async function logout (req, res) {
 
 }
 
-app.post('/api/send_id',logout)
+app.post('/api/send_id',send_id)
 async function logout (req, res) {
 
   let receivedPost = await post.getPostObject(req);
@@ -198,9 +198,11 @@ async function logout (req, res) {
     await queryDatabase("UPDATE users SET anvers='" + anversDNI + "', revers='" + reversDNI + "' WHERE sessionToken='" + token + "';")
     response["status"] = "OK";
     response["message"] = "Imatges pujades a la BDD";
+    console.log("OKK")
   } else {
     response["status"] = "KO";
     response["message"] = "No s'han pogut pujar les imatges a la BDD";
+    console.log("KO")
   }
   
   res.end(JSON.stringify(response));
