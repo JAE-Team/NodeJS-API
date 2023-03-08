@@ -185,8 +185,8 @@ async function logout (req, res) {
 
 }
 
-app.post('/api/send_id',send_id)
-async function logout (req, res) {
+app.post('/api/send_id',sendID)
+async function sendID (req, res) {
 
   let receivedPost = await post.getPostObject(req);
   let token = receivedPost.sessionToken;
