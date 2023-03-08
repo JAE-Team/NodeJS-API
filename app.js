@@ -290,6 +290,7 @@ async function getPayment (req, res) {
 
     let message;
     let balancePayer;
+    let balance;
     await queryDatabase("SET autocommit = 0;");
     /* Primero si la variable accept enviada a traves del post, booleana, es true, significa que el
     usuario que tiene que pagar da el OK a la transaccion */
@@ -314,6 +315,7 @@ async function getPayment (req, res) {
         console.log(balanceReceptor);
         queryDatabase("UPDATE users SET userBalance ="+ (balanceReceptor[0].userBalance+ammount) +" WHERE userId ='"+ userReceptorId[0].userDestiny+"';");
         message = "Transacció aceptada";
+        balance = balanceReceptor[0].userBalance + ammount;
         console.log("si");
       }else{
         queryDatabase("UPDATE transactions SET userOrigin ="+ userId +", ammount ="+ ammount +", accepted = "+ "'insufficient balance'"+ ", timeFinish = NOW() WHERE token ='"+ token+"';");
@@ -321,12 +323,12 @@ async function getPayment (req, res) {
       }
     }else{
       queryDatabase("UPDATE transactions SET userOrigin ="+ userId +", ammount ="+ ammount +", accepted = "+ "'rejectedByUser'"+ ", timeFinish = NOW() WHERE token ='"+ token+"';");
-      message = "Transacció reutjada per l'usuari";
+      message = "Transacció rebutjada per l'usuari";
     }
     await queryDatabase("COMMIT;");
     await queryDatabase("SET autocommit = 1;");
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({"status":"OK", "message":message}));
+    res.end(JSON.stringify({"status":"OK", "message":message, "balance":balance}));
 
 }catch(e){
   console.log("ERROR: " + e.stack)
