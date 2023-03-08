@@ -189,20 +189,19 @@ app.post('/api/send_id',sendID)
 async function sendID (req, res) {
 
   let receivedPost = await post.getPostObject(req);
-  let token = receivedPost.sessionToken;
+  let user_id = receivedPost.user_id;
   let anversDNI = receivedPost.anvers;
   let reversDNI = receivedPost.revers;
   let response = {};
 
   if (receivedPost.type == "uploadFile") {
-    await queryDatabase("UPDATE users SET anvers='" + anversDNI + "', revers='" + reversDNI + "' WHERE sessionToken='" + token + "';")
+    await queryDatabase("UPDATE users SET anvers='" + anversDNI + "', revers='" + reversDNI + "', verificationStatus='WAITING_VERIFICATION' WHERE userId='" + user_id + "';")
     response["status"] = "OK";
     response["message"] = "Imatges pujades a la BDD";
-    console.log("OKK")
+    response["statusDNI"] = "WAITING_VERIFICATION";
   } else {
     response["status"] = "KO";
     response["message"] = "No s'han pogut pujar les imatges a la BDD";
-    console.log("KO")
   }
   
   res.end(JSON.stringify(response));
