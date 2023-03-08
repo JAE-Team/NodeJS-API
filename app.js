@@ -189,17 +189,21 @@ app.post('/api/send_id',logout)
 async function logout (req, res) {
 
   let receivedPost = await post.getPostObject(req);
+  let token = receivedPost.sessionToken;
   let anversDNI = receivedPost.anvers;
   let reversDNI = receivedPost.revers;
+  let response = {};
 
   if (receivedPost.type == "uploadFile") {
-    console.log(anversDNI);
-    console.log(reversDNI);
+    await queryDatabase("UPDATE users SET anvers='" + anversDNI + "', revers='" + reversDNI + "' WHERE sessionToken='" + token + "';")
+    response["status"] = "OK";
+    response["message"] = "Imatges pujades a la BDD";
+  } else {
+    response["status"] = "KO";
+    response["message"] = "No s'han pogut pujar les imatges a la BDD";
   }
-
   
-  res.end(JSON.stringify({"status":"OK"}));
-
+  res.end(JSON.stringify(response));
 }
 
 app.post('/api/setup_payment',setupPayment)
@@ -360,11 +364,11 @@ function queryDatabase (query) {
 
   return new Promise((resolve, reject) => {
     var connection = mysql.createConnection({
-      host: process.env.MYSQLHOST || "localhost",
-      port: process.env.MYSQLPORT || 3306,
+      host: process.env.MYSQLHOST || "containers-us-west-167.railway.app",
+      port: process.env.MYSQLPORT || 7210,
       user: process.env.MYSQLUSER || "root",
-      password: process.env.MYSQLPASSWORD || "password",
-      database: process.env.MYSQLDATABASE || "proyecto2"
+      password: process.env.MYSQLPASSWORD || "j7YboDzy5yIdT6F8FRei",
+      database: process.env.MYSQLDATABASE || "railway"
     });
 
     /* Albert: Para hacer pruebas en local en mi PC */
