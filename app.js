@@ -34,11 +34,13 @@ async function getProfiles (req, res) {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     if("filterBalance" in receivedPost){
       let range = receivedPost.filterBalance.split(";");
-      filters+="userBalance BETWEEN "+range[0]+" AND "+range[1];
+      filters+=" userBalance BETWEEN "+range[0]+" AND "+range[1];
       console.log(filters)
+    }else if("filterStatus" in receivedPost){
+      filters+=" verificationStatus='"+receivedPost.filterStatus+"'";
     }
     if(filters!=""){
-      var results= await queryDatabase("SELECT userName, userBalance FROM users WHERE "+filters+";");
+      var results= await queryDatabase("SELECT userName, userBalance FROM users WHERE"+filters+";");
     }else{
       var results= await queryDatabase("SELECT userName, userBalance FROM users;");
     }
