@@ -185,13 +185,13 @@ app.post('/api/send_id',sendID)
 async function sendID (req, res) {
 
   let receivedPost = await post.getPostObject(req);
-  let user_id = receivedPost.user_id;
+  let sessionToken = receivedPost.sessionToken;
   let anversDNI = receivedPost.anvers;
   let reversDNI = receivedPost.revers;
   let response = {};
 
   if (receivedPost.type == "uploadFile") {
-    await queryDatabase("UPDATE users SET anvers='" + anversDNI + "', revers='" + reversDNI + "', verificationStatus='WAITING_VERIFICATION' WHERE userId='" + user_id + "';")
+    await queryDatabase("UPDATE users SET anvers='" + anversDNI + "', revers='" + reversDNI + "', verificationStatus='WAITING_VERIFICATION' WHERE sessionToken='" + sessionToken + "';")
     response["status"] = "OK";
     response["message"] = "Imatges pujades a la BDD";
     response["statusDNI"] = "WAITING_VERIFICATION";
