@@ -36,9 +36,11 @@ async function getProfiles (req, res) {
       let range = receivedPost.filterBalance.split(";");
       filters+=" userBalance BETWEEN "+range[0]+" AND "+range[1];
       console.log(filters)
-    }else if("filterStatus" in receivedPost){
+    }if("filterStatus" in receivedPost){
+      filters+= filters!="" ? " AND" : "";
       filters+=" verificationStatus='"+receivedPost.filterStatus+"'";
-    }else if("filterTransactions" in receivedPost){
+    }if("filterTransactions" in receivedPost){
+      filters+= filters!="" ? " AND" : "";
       let range = receivedPost.filterTransactions.split(";");
       filters+=" userId IN (SELECT userId FROM users JOIN transactions ON users.userId = transactions.userOrigin OR users.userId = transactions.userDestiny ";
       filters+="GROUP BY userId HAVING COUNT(*) >= "+range[0]+" AND COUNT(*) <= "+range[1]+");"
