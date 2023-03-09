@@ -28,9 +28,20 @@ function appListen () {
 //Get profiles endpoint
 app.post('/api/get_profiles',getProfiles)
 async function getProfiles (req, res) {
+  let receivedPost = await post.getPostObject(req);
+  let filters="";
   try{
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    var results= await queryDatabase("SELECT * FROM users;");
+    if("filterBalance" in receivedPost){
+      let range = receivedPost.filterBalance.split(";");
+      filters+="userBalance BETWEEN "+range[0]+" AND "+range[1];
+      console.log(filters)
+    }
+    if(filters!=""){
+      var results= await queryDatabase("SELECT userName, userBalance FROM users WHERE "+filters+";");
+    }else{
+      var results= await queryDatabase("SELECT userName, userBalance FROM users;");
+    }
     res.end(JSON.stringify({"status":"OK","message":results}));
   }catch(e){
     console.log("ERROR: " + e.stack)
