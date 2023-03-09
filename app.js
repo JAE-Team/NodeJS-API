@@ -75,8 +75,6 @@ async function getTransactions (req, res) {
   console.log(receivedPost);
   try{
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    // var resultName = await queryDatabase("SELECT userName, userSurname FROM USERS WHERE userId="+receivedPost.userId+";");
-    // var results= await queryDatabase("SELECT DISTINCT t.*, u.userName FROM transactions t INNER JOIN users u ON t.userDestiny = u.userId OR t.userOrigin = u.userId WHERE userDestiny="+receivedPost.userId+" OR userOrigin="+receivedPost.userId+";");
     var results= await queryDatabase("SELECT transactions.*, usersO.userName AS originName, usersD.userName AS destinyName"
     +", usersO.userSurname AS originSurname,  usersD.userSurname AS destinySurname"
     +" FROM transactions"
@@ -103,7 +101,6 @@ async function signup (req, res) {
     let message;
     let token = "ST-" + uuidv4();
     let response={}
-    // let done = false;
 
     let phone = receivedPost.userId;
     let password = receivedPost.userPassword;
@@ -143,7 +140,6 @@ async function signup (req, res) {
     }
 
     res.end(JSON.stringify(response));
-    // res.end(JSON.stringify({"status":"OK", "message":message, "done":done}));
   }catch(e){
     console.log("ERROR: " + e.stack)
   }
@@ -200,13 +196,13 @@ app.post('/api/send_id',sendID)
 async function sendID (req, res) {
 
   let receivedPost = await post.getPostObject(req);
-  let user_id = receivedPost.user_id;
+  let sessionToken = receivedPost.sessionToken;
   let anversDNI = receivedPost.anvers;
   let reversDNI = receivedPost.revers;
   let response = {};
 
   if (receivedPost.type == "uploadFile") {
-    await queryDatabase("UPDATE users SET anvers='" + anversDNI + "', revers='" + reversDNI + "', verificationStatus='WAITING_VERIFICATION' WHERE userId='" + user_id + "';")
+    await queryDatabase("UPDATE users SET anvers='" + anversDNI + "', revers='" + reversDNI + "', verificationStatus='WAITING_VERIFICATION' WHERE sessionToken='" + sessionToken + "';")
     response["status"] = "OK";
     response["message"] = "Imatges pujades a la BDD";
     response["statusDNI"] = "WAITING_VERIFICATION";
@@ -353,12 +349,6 @@ function isValidNumber(number) {
     return false
   }
 }
-/* console.log(isValidNumber("135"));
-console.log(isValidNumber("45.678"));
-console.log(isValidNumber("12,34"));
-console.log(isValidNumber("errr"));
-console.log(isValidNumber("df.h"));
-console.log(isValidNumber("123.4.5")); */
 
 function getDate(){
   var now = new Date();
@@ -384,15 +374,6 @@ function queryDatabase (query) {
       password: process.env.MYSQLPASSWORD || "j7YboDzy5yIdT6F8FRei",
       database: process.env.MYSQLDATABASE || "railway"
     });
-
-    /* Albert: Para hacer pruebas en local en mi PC */
-/*     var connection = mysql.createConnection({
-      host: process.env.MYSQLHOST || "localhost",
-      port: process.env.MYSQLPORT || 3306,
-      user: process.env.MYSQLUSER || "root",
-      password: process.env.MYSQLPASSWORD || "localhost",
-      database: process.env.MYSQLDATABASE || "ieticorn_database"
-    }); */
 
     connection.query(query, (error, results) => { 
       if (error) reject(error);
