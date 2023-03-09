@@ -38,6 +38,10 @@ async function getProfiles (req, res) {
       console.log(filters)
     }else if("filterStatus" in receivedPost){
       filters+=" verificationStatus='"+receivedPost.filterStatus+"'";
+    }else if("filterTransactions" in receivedPost){
+      let range = receivedPost.filterTransactions.split(";");
+      filters+=" userId IN (SELECT userId FROM users JOIN transactions ON users.userId = transactions.userOrigin OR users.userId = transactions.userDestiny ";
+      filters+="GROUP BY userId HAVING COUNT(*) >= "+range[0]+" AND COUNT(*) <= "+range[1]+");"
     }
     if(filters!=""){
       var results= await queryDatabase("SELECT userName, userBalance FROM users WHERE"+filters+";");
