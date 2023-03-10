@@ -67,6 +67,18 @@ async function getProfile (req, res) {
     var results = await queryDatabase("SELECT * FROM users WHERE sessionToken='" + receivedPost.sessionToken + "';");
     console.log(results);
     res.end(JSON.stringify({"status":"OK","message":results}));
+  }
+}
+
+app.post('/api/get_userDNI',getDNI)
+async function getDNI (req, res) {
+  res.writeHead(200, { 'Content-Type': 'application/json' });
+
+  let receivedPost = await post.getPostObject(req);
+  if((await queryDatabase("SELECT anvers,revers FROM users WHERE id='" + receivedPost.user_id + "';")).length > 0){
+    var results = await queryDatabase("SELECT anvers,revers FROM users WHERE id='" + receivedPost.user_id + "';");
+    console.log(results);
+    res.end(JSON.stringify({"status":"OK","message":results}));
   } else {
     console.log(receivedPost.sessionToken);
     res.end(JSON.stringify({"status":"Error","message":"Failed to get the profile"}));
