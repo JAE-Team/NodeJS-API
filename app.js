@@ -46,9 +46,9 @@ async function getProfiles (req, res) {
       filters+="GROUP BY userId HAVING COUNT(*) >= "+range[0]+" AND COUNT(*) <= "+range[1]+");"
     }
     if(filters!=""){
-      var results= await queryDatabase("SELECT userName, userBalance FROM users WHERE"+filters+";");
+      var results= await queryDatabase("SELECT * FROM users WHERE"+filters+";");
     }else{
-      var results= await queryDatabase("SELECT userName, userBalance FROM users;");
+      var results= await queryDatabase("SELECT * FROM users;");
     }
     res.end(JSON.stringify({"status":"OK","message":results}));
   }catch(e){
