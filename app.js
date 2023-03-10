@@ -239,15 +239,14 @@ async function setupPayment (req, res) {
   try{
     /* Tenemos un post, de este post obtendremos el id de usuario y la cantidad */
     let receivedPost = await post.getPostObject(req);
-    let userIdDestination = receivedPost.user_id;
+    let userToken = receivedPost.destUToken;
     let amount = receivedPost.amount;
-    var token;
     let message;
 
-    /* Comprobamos que el id de usuario existe */
-    let checkUserExists = queryDatabase ("SELECT * FROM users WHERE userId='"+userIdDestination+"';");
-    if(checkUserExists.length==0){
-      message = "Usuari no existeix a la base de dades";
+    /* Comprobamos que user correcponde el token */
+    let userDest = await queryDatabase ("SELECT userId FROM users WHERE sessionToken='"+userToken+"';");
+    if(userDest.length!=0){
+      message = "No s'ha trobat el usuari destinatari";
       /* En caso contrario, el usuario de id existe, vamos a comprobar si la cantidad 
        esta en un formato numerico y es mayor que 0 (no tiene sentido una transferencia negativa) */
     }else if(isValidNumber(amount)==false){
@@ -261,7 +260,7 @@ async function setupPayment (req, res) {
       token = "P-"+uuidv4();
       let now=getDate();
       console.log(now)
-      queryDatabase("INSERT INTO transactions (token, userDestiny,ammount, accepted) VALUES ('"+token +"', '"+ userIdDestination +"',"+amount+", 'waitingAcceptance')");
+      queryDatabase("INSERT INTO transactions (token, userDestiny,ammount, accepted) VALUES ('"+token +"', '"+ userDest[0].userId +"',"+amount+", 'waitingAcceptance')");
       //var results= await queryDatabase("SELECT * FROM users");
     }
       res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -278,26 +277,37 @@ async function startPayment (req, res) {
   try{
     let receivedPost = await post.getPostObject(req);
     const TOKEN = receivedPost.transaction_token;
+    let sourceToken = receivedPost.sourceUToken;
     let RESULT = {};
     //let userIdOrigin = receivedPost.user_id; FUTURE IMPLEMENTATION
-    let resultQuery = await queryDatabase("SELECT * FROM transactions WHERE token='"+TOKEN+"';");
-
-    if(resultQuery.length==0){
-      message = "Transacció no trobada";
-      RESULT={"status":"Error","message":message}
-      /* Comprobar que el token no sea de una transaccion ya aceptada (y por tanto finalizada) */
-    }else if(resultQuery[0]["accepted"] != "waitingAcceptance"){
-      message = "Transacció repetida, no pot ser acceptada";
-      RESULT = {"status":"Error","message":message};
+    let sourceUser = await queryDatabase ("SELECT userId FROM users WHERE sessionToken='"+sourceToken+"';");
+    if(sourceUser.length!=0){
+      let resultQuery = await queryDatabase("SELECT * FROM transactions WHERE token='"+TOKEN+"';");
+      if(resultQuery.length==0){
+        message = "Transacció no trobada";
+        RESULT={"status":"Error","message":message}
+        /* Comprobar que el token no sea de una transaccion ya aceptada (y por tanto finalizada) */
+      }else if(resultQuery[0]["accepted"] != "waitingAcceptance"){
+        message = "Transacció repetida, no pot ser acceptada";
+        RESULT = {"status":"Error","message":message};
+      }else{
+        message = "Transaction done correctly";
+        RESULT={"status":"OK","message":message,"transaction_type":"Payment","amount":resultQuery[0]["ammount"]};
+      }
+      /* Necesitamos tener las fechas de setupPayment, startPayment y finishPayment para llevar un registro de cuanto tiempo
+      pasa entre cada parte de la transferencia */
+      queryDatabase("UPDATE transactions SET timeStart = NOW(), userOrigin = '"+sourceUser[0].userId+"' WHERE token ='"+ TOKEN +"';");
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(RESULT));
     }else{
-      message = "Transaction done correctly";
-      RESULT={"status":"OK","message":message,"transaction_type":"Payment","amount":resultQuery[0]["ammount"]};
+      message = "No s'ha trobat el usuari d'origen";
+      RESULT = {"status":"Error","message":message};
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(RESULT));
     }
-    /* Necesitamos tener las fechas de setupPayment, startPayment y finishPayment para llevar un registro de cuanto tiempo
-    pasa entre cada parte de la transferencia */
-    queryDatabase("UPDATE transactions SET timeStart = NOW() WHERE token ='"+ TOKEN +"';");
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(RESULT));
+    
+
+    
   }catch(e){
     console.log("ERROR: " + e.stack)
     RESULT = {"status":"Error","message":"Transacció no pot ser completada"};
@@ -310,55 +320,63 @@ app.post('/api/finish_payment', getPayment)
 async function getPayment (req, res) {
   try{
     let receivedPost = await post.getPostObject(req);
-    let userId = receivedPost.user_id;
+    let userToken = receivedPost.sourceUToken;
     let token = receivedPost.transaction_token;
     let accept = receivedPost.accept;
     let ammount = receivedPost.amount;
-
     let message;
     let balancePayer;
     let balance;
-    await queryDatabase("SET autocommit = 0;");
-    /* Primero si la variable accept enviada a traves del post, booleana, es true, significa que el
-    usuario que tiene que pagar da el OK a la transaccion */
-    if(accept){
-      balancePayer = await queryDatabase ("SELECT userBalance FROM users WHERE userId='"+userId+"';");
-      console.log(balancePayer[0].userBalance)
-      /*Comprobamos si el usuario tiene saldo suficiente para hacer la transferencia  */
-      if(ammount<=balancePayer[0].userBalance){
-        /* Registramos el resto de datos en la transferencia, 
-        ya sea que es aceptada, denegada pro falta de dinero o por el mismo usuario */
-        queryDatabase("UPDATE transactions SET userOrigin ="+ userId +", ammount ="+ ammount +", accepted = "+ "'acceptedByUser'"+ ", timeFinish = NOW() WHERE token ='"+ token+"';");
+    let userId = await queryDatabase ("SELECT userId FROM users WHERE sessionToken='"+userToken+"';");
+    if(userId.length!=0){
+      userId=userId[0].userId;
+      await queryDatabase("SET autocommit = 0;");
+      /* Primero si la variable accept enviada a traves del post, booleana, es true, significa que el
+      usuario que tiene que pagar da el OK a la transaccion */
+      if(accept){
+        balancePayer = await queryDatabase ("SELECT userBalance FROM users WHERE userId='"+userId+"';");
+        console.log(balancePayer[0].userBalance)
+        /*Comprobamos si el usuario tiene saldo suficiente para hacer la transferencia  */
+        if(ammount<=balancePayer[0].userBalance){
+          /* Registramos el resto de datos en la transferencia, 
+          ya sea que es aceptada, denegada pro falta de dinero o por el mismo usuario */
+          queryDatabase("UPDATE transactions SET userOrigin ="+ userId +", ammount ="+ ammount +", accepted = "+ "'acceptedByUser'"+ ", timeFinish = NOW() WHERE token ='"+ token+"';");
 
-        /* Actualizamos el balance del usuario que paga */
-        queryDatabase("UPDATE users SET userBalance ="+ (balancePayer[0].userBalance-ammount) +" WHERE userId ='"+ userId+"';");
-        
-        /* Actualizamos el balance del usuario que recibe, primero debemos encontrar la id
-        del usuario receptor a partir del token de la transferencia y su saldo,
-        con esos datos lo actualizamos */
-        let userReceptorId = await queryDatabase ("SELECT userDestiny FROM transactions WHERE token='"+token+"';");
-        console.log("SELECT userBalance FROM users WHERE userId='"+userReceptorId[0].userDestiny+"';");
-        let balanceReceptor = await queryDatabase ("SELECT userBalance FROM users WHERE userId='"+userReceptorId[0].userDestiny+"';");
-        console.log(balanceReceptor);
-        queryDatabase("UPDATE users SET userBalance ="+ (balanceReceptor[0].userBalance+ammount) +" WHERE userId ='"+ userReceptorId[0].userDestiny+"';");
-        message = "Transacció aceptada";
-        balance = balanceReceptor[0].userBalance + ammount;
-        console.log("si");
+          /* Actualizamos el balance del usuario que paga */
+          queryDatabase("UPDATE users SET userBalance ="+ (balancePayer[0].userBalance-ammount) +" WHERE userId ='"+ userId+"';");
+          
+          /* Actualizamos el balance del usuario que recibe, primero debemos encontrar la id
+          del usuario receptor a partir del token de la transferencia y su saldo,
+          con esos datos lo actualizamos */
+          let userReceptorId = await queryDatabase ("SELECT userDestiny FROM transactions WHERE token='"+token+"';");
+          console.log("SELECT userBalance FROM users WHERE userId='"+userReceptorId[0].userDestiny+"';");
+          let balanceReceptor = await queryDatabase ("SELECT userBalance FROM users WHERE userId='"+userReceptorId[0].userDestiny+"';");
+          console.log(balanceReceptor);
+          queryDatabase("UPDATE users SET userBalance ="+ (balanceReceptor[0].userBalance+ammount) +" WHERE userId ='"+ userReceptorId[0].userDestiny+"';");
+          message = "Transacció aceptada";
+          balance = balanceReceptor[0].userBalance + ammount;
+          console.log("si");
+        }else{
+          queryDatabase("UPDATE transactions SET userOrigin ="+ userId +", ammount ="+ ammount +", accepted = "+ "'insufficient balance'"+ ", timeFinish = NOW() WHERE token ='"+ token+"';");
+          message = "Transacció rebutjada, el usuari que está pagant no té suficient sou";
+        }
       }else{
-        queryDatabase("UPDATE transactions SET userOrigin ="+ userId +", ammount ="+ ammount +", accepted = "+ "'insufficient balance'"+ ", timeFinish = NOW() WHERE token ='"+ token+"';");
-        message = "Transacció rebutjada, el usuari que está pagant no té suficient sou";
+        queryDatabase("UPDATE transactions SET userOrigin ="+ userId +", ammount ="+ ammount +", accepted = "+ "'rejectedByUser'"+ ", timeFinish = NOW() WHERE token ='"+ token+"';");
+        message = "Transacció rebutjada per l'usuari";
       }
+      await queryDatabase("COMMIT;");
+      await queryDatabase("SET autocommit = 1;");
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({"status":"OK", "message":message, "balance":balance}));
     }else{
-      queryDatabase("UPDATE transactions SET userOrigin ="+ userId +", ammount ="+ ammount +", accepted = "+ "'rejectedByUser'"+ ", timeFinish = NOW() WHERE token ='"+ token+"';");
-      message = "Transacció rebutjada per l'usuari";
+      message = "No s'ha trobat el usuari d'origen";
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({"status":"ERROR", "message":message}));
     }
-    await queryDatabase("COMMIT;");
-    await queryDatabase("SET autocommit = 1;");
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({"status":"OK", "message":message, "balance":balance}));
 
 }catch(e){
   console.log("ERROR: " + e.stack)
+  await queryDatabase("SET autocommit = 1;");
 }
 }
 
