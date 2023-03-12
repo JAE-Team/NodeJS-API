@@ -5,6 +5,7 @@ const mysql = require('mysql2')
 const post = require('./post.js')
 const { v4: uuidv4 } = require('uuid')
 const { response } = require('express')
+const { stat } = require('fs')
 
 // Wait 'ms' milliseconds
 function wait (ms) {
@@ -67,6 +68,9 @@ async function getProfile (req, res) {
     var results = await queryDatabase("SELECT * FROM users WHERE sessionToken='" + receivedPost.sessionToken + "';");
     console.log(results);
     res.end(JSON.stringify({"status":"OK","message":results}));
+  } else {
+    console.log(receivedPost.sessionToken);
+    res.end(JSON.stringify({"status":"Error","message":"Failed to get the profile"}));
   }
 }
 
@@ -229,6 +233,40 @@ async function sendID (req, res) {
   } else {
     response["status"] = "KO";
     response["message"] = "No s'han pogut pujar les imatges a la BDD";
+  }
+  
+  res.end(JSON.stringify(response));
+}
+
+app.post('/api/make_verification',makeVerification)
+async function makeVerification (req, res) {
+
+  let receivedPost = await post.getPostObject(req);
+  let id = receivedPost.user_id;
+  let statusVerification = receivedPost.status;
+  let response = {};
+
+  if ((await queryDatabase("SELECT * FROM users WHERE id="+ id +";")).length > 0) {
+    switch (statusVerification) {
+      case "accepted":
+        await queryDatabase("UPDATE users SET verificationStatus='ACCEPTED' WHERE id=" + id + ";")
+        response["status"] = "OK";
+        response["message"] = "Usuari accceptat";
+        break;
+
+      case "rejected":
+        await queryDatabase("UPDATE users SET verificationStatus='REJECTED' WHERE id=" + id + ";")
+        response["status"] = "OK";
+        response["message"] = "Usuari rebutjat";
+        break;
+    
+      default:
+        break;
+    }
+    
+  } else {
+    response["status"] = "KO";
+    response["message"] = "No s'ha pogut fer la verificació";
   }
   
   res.end(JSON.stringify(response));
