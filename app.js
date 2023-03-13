@@ -280,10 +280,11 @@ async function setupPayment (req, res) {
     let userToken = receivedPost.destUToken;
     let amount = receivedPost.amount;
     let message;
+    let token;
 
     /* Comprobamos que user correcponde el token */
     let userDest = await queryDatabase ("SELECT userId FROM users WHERE sessionToken='"+userToken+"';");
-    if(userDest.length!=0){
+    if(userDest.length == 0){
       message = "No s'ha trobat el usuari destinatari";
       /* En caso contrario, el usuario de id existe, vamos a comprobar si la cantidad 
        esta en un formato numerico y es mayor que 0 (no tiene sentido una transferencia negativa) */
