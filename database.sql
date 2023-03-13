@@ -14,6 +14,9 @@ CREATE TABLE users(
   userStatus VARCHAR(50) DEFAULT 'active',
   lastStatusChange TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   sessionToken VARCHAR(255),
+  verificationStatus ENUM('NOT_VERIFIED', 'WAITING_VERIFICATION', 'ACCEPTED', 'REJECTED') default 'NOT_VERIFIED',
+  anvers MEDIUMTEXT,
+  revers MEDIUMTEXT,
   PRIMARY KEY(id)
 );
 

@@ -5,6 +5,7 @@ const mysql = require('mysql2')
 const post = require('./post.js')
 const { v4: uuidv4 } = require('uuid')
 const { response } = require('express')
+const { stat } = require('fs')
 
 // Wait 'ms' milliseconds
 function wait (ms) {
@@ -28,10 +29,37 @@ function appListen () {
 //Get profiles endpoint
 app.post('/api/get_profiles',getProfiles)
 async function getProfiles (req, res) {
+  let receivedPost = await post.getPostObject(req);
+  let filters="";
   try{
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    var results= await queryDatabase("SELECT * FROM users;");
-    res.end(JSON.stringify({"status":"OK","message":results}));
+    if("filterBalance" in receivedPost){
+      let range = receivedPost.filterBalance.split(";");
+      filters+=" userBalance BETWEEN "+range[0]+" AND "+range[1];
+      console.log(filters)
+    }if("filterStatus" in receivedPost){
+      filters+= filters!="" ? " AND" : "";
+      filters+=" verificationStatus='"+receivedPost.filterStatus+"'";
+    }if("filterTransactions" in receivedPost){
+      filters+= filters!="" ? " AND" : "";
+      let range = receivedPost.filterTransactions.split(";");
+      filters+=" userId IN (SELECT userId FROM users JOIN transactions ON users.userId = transactions.userOrigin OR users.userId = transactions.userDestiny ";
+      filters+="GROUP BY userId HAVING COUNT(*) >= "+range[0]+" AND COUNT(*) <= "+range[1]+");"
+    }
+    if(filters!=""){
+      var results= await queryDatabase("SELECT id, userId, userPassword, userName, userSurname, \
+                                        userEmail, userBalance, userStatus, lastStatusChange,\
+                                        sessionToken, verificationStatus FROM users WHERE"+filters+";");
+    }else{
+      var results= await queryDatabase("SELECT id, userId, userPassword, userName, userSurname,\
+                                         userEmail, userBalance, userStatus, lastStatusChange,\
+                                          sessionToken, verificationStatus FROM users;");
+    }
+    if(results.length==0){
+      res.end(JSON.stringify({"status":"Error","message":"No s'ha trobat cap usuari"}));
+    }else{
+      res.end(JSON.stringify({"status":"OK","message":results}));
+    }
   }catch(e){
     console.log("ERROR: " + e.stack)
     res.end(JSON.stringify({"status":"Error","message":"Failed to get the profiles"}));
@@ -42,10 +70,33 @@ async function getProfiles (req, res) {
 app.post('/api/get_profile',getProfile)
 async function getProfile (req, res) {
   res.writeHead(200, { 'Content-Type': 'application/json' });
+  let receivedPost = await post.getPostObject(req);
+  let query;
+  if(receivedPost.returnDNI){
+    query = "SELECT *";
+  }else{
+    query = "SELECT id, userId, userPassword, userName, userSurname,\
+              userEmail, userBalance, userStatus, lastStatusChange,\
+              sessionToken, verificationStatus";
+  }
+  query+=" FROM users WHERE sessionToken='" + receivedPost.sessionToken + "';";
+  if((await queryDatabase(query)).length > 0){
+    var results = await queryDatabase(query);
+    console.log(results);
+    res.end(JSON.stringify({"status":"OK","message":results}));
+  } else {
+    console.log(receivedPost.sessionToken);
+    res.end(JSON.stringify({"status":"Error","message":"Failed to get the profile"}));
+  }
+}
+
+app.post('/api/get_userDNI',getDNI)
+async function getDNI (req, res) {
+  res.writeHead(200, { 'Content-Type': 'application/json' });
 
   let receivedPost = await post.getPostObject(req);
-  if((await queryDatabase("SELECT * FROM users WHERE sessionToken='" + receivedPost.sessionToken + "';")).length > 0){
-    var results = await queryDatabase("SELECT * FROM users WHERE sessionToken='" + receivedPost.sessionToken + "';");
+  if((await queryDatabase("SELECT anvers,revers FROM users WHERE id='" + receivedPost.user_id + "';")).length > 0){
+    var results = await queryDatabase("SELECT anvers,revers FROM users WHERE id='" + receivedPost.user_id + "';");
     console.log(results);
     res.end(JSON.stringify({"status":"OK","message":results}));
   } else {
@@ -64,8 +115,6 @@ async function getTransactions (req, res) {
   console.log(receivedPost);
   try{
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    // var resultName = await queryDatabase("SELECT userName, userSurname FROM USERS WHERE userId="+receivedPost.userId+";");
-    // var results= await queryDatabase("SELECT DISTINCT t.*, u.userName FROM transactions t INNER JOIN users u ON t.userDestiny = u.userId OR t.userOrigin = u.userId WHERE userDestiny="+receivedPost.userId+" OR userOrigin="+receivedPost.userId+";");
     var results= await queryDatabase("SELECT transactions.*, usersO.userName AS originName, usersD.userName AS destinyName"
     +", usersO.userSurname AS originSurname,  usersD.userSurname AS destinySurname"
     +" FROM transactions"
@@ -88,12 +137,13 @@ async function signup (req, res) {
     /* La respuesta sera un post que ademas del status, nos dara un mensaje informativo 
      Creo que aparte del mensaje, quizas tener una variable booleana que indique si la acción
       se ha hecho o no sea mas sencillo que trabajar directamente con el mensaje */
+    await queryDatabase("SET autocommit = 0;");
+
     let receivedPost = await post.getPostObject(req);
     let message;
-    let token = "ST-" + uuidv4();
+    let token = await generateToken();
     let response={}
-    // let done = false;
-
+    let tokenPay = "P-"+uuidv4();
     let phone = receivedPost.userId;
     let password = receivedPost.userPassword;
     let email = receivedPost.userEmail;
@@ -125,14 +175,16 @@ async function signup (req, res) {
       response["message"] = "Format incorrecte de correu";
       
     } else {
+      queryDatabase("INSERT INTO transactions (token, userDestiny, userOrigin,ammount, accepted) VALUES ('"+tokenPay +"', '"+ phone +"','CORNSERVICE',"+balance+", 'acceptedByUser')");
       queryDatabase("INSERT INTO users (userId, userPassword, userName, userSurname, userEmail, userBalance, sessionToken) VALUES ('"+phone+"','"+password+"', '"+name+"', '"+surname+"', '"+email+"', '"+balance+"', '"+token+"');");
       response["status"]="OK";
       response["message"] = "Usuari creat satisfactoriament";
       response["token"] = token;
     }
+    await queryDatabase("COMMIT;");
+    await queryDatabase("SET autocommit = 1;");
 
     res.end(JSON.stringify(response));
-    // res.end(JSON.stringify({"status":"OK", "message":message, "done":done}));
   }catch(e){
     console.log("ERROR: " + e.stack)
   }
@@ -141,7 +193,7 @@ async function signup (req, res) {
 app.post('/api/login',login)
 async function login (req, res) {
   let receivedPost = await post.getPostObject(req);
-  let token = "ST-"+uuidv4();
+  let token = await generateToken();
   let response={}
   // let password = receivedPost.password;
   let userSearch = await queryDatabase ("SELECT * FROM users WHERE userEmail='"+receivedPost.userEmail+"';");
@@ -185,20 +237,76 @@ async function logout (req, res) {
 
 }
 
+app.post('/api/send_id',sendID)
+async function sendID (req, res) {
+
+  let receivedPost = await post.getPostObject(req);
+  let sessionToken = receivedPost.sessionToken;
+  let anversDNI = receivedPost.anvers;
+  let reversDNI = receivedPost.revers;
+  let response = {};
+
+  if (receivedPost.type == "uploadFile") {
+    await queryDatabase("UPDATE users SET anvers='" + anversDNI + "', revers='" + reversDNI + "', verificationStatus='WAITING_VERIFICATION' WHERE sessionToken='" + sessionToken + "';")
+    response["status"] = "OK";
+    response["message"] = "Imatges pujades satisfactoriament";
+    response["statusDNI"] = "WAITING_VERIFICATION";
+  } else {
+    response["status"] = "KO";
+    response["message"] = "No s'han pogut pujar les imatges a la BDD";
+  }
+  
+  res.end(JSON.stringify(response));
+}
+
+app.post('/api/make_verification',makeVerification)
+async function makeVerification (req, res) {
+
+  let receivedPost = await post.getPostObject(req);
+  let id = receivedPost.user_id;
+  let statusVerification = receivedPost.status;
+  let response = {};
+
+  if ((await queryDatabase("SELECT * FROM users WHERE id="+ id +";")).length > 0) {
+    switch (statusVerification) {
+      case "accepted":
+        await queryDatabase("UPDATE users SET verificationStatus='ACCEPTED' WHERE id=" + id + ";")
+        response["status"] = "OK";
+        response["message"] = "Usuari accceptat";
+        break;
+
+      case "rejected":
+        await queryDatabase("UPDATE users SET verificationStatus='REJECTED' WHERE id=" + id + ";")
+        response["status"] = "OK";
+        response["message"] = "Usuari rebutjat";
+        break;
+    
+      default:
+        break;
+    }
+    
+  } else {
+    response["status"] = "KO";
+    response["message"] = "No s'ha pogut fer la verificació";
+  }
+  
+  res.end(JSON.stringify(response));
+}
+
 app.post('/api/setup_payment',setupPayment)
 async function setupPayment (req, res) {
   try{
     /* Tenemos un post, de este post obtendremos el id de usuario y la cantidad */
     let receivedPost = await post.getPostObject(req);
-    let userIdDestination = receivedPost.user_id;
+    let userToken = receivedPost.destUToken;
     let amount = receivedPost.amount;
-    var token;
     let message;
+    let token;
 
-    /* Comprobamos que el id de usuario existe */
-    let checkUserExists = queryDatabase ("SELECT * FROM users WHERE userId='"+userIdDestination+"';");
-    if(checkUserExists.length==0){
-      message = "Usuari no existeix a la base de dades";
+    /* Comprobamos que user correcponde el token */
+    let userDest = await queryDatabase ("SELECT userId FROM users WHERE sessionToken='"+userToken+"';");
+    if(userDest.length == 0){
+      message = "No s'ha trobat el usuari destinatari";
       /* En caso contrario, el usuario de id existe, vamos a comprobar si la cantidad 
        esta en un formato numerico y es mayor que 0 (no tiene sentido una transferencia negativa) */
     }else if(isValidNumber(amount)==false){
@@ -212,7 +320,7 @@ async function setupPayment (req, res) {
       token = "P-"+uuidv4();
       let now=getDate();
       console.log(now)
-      queryDatabase("INSERT INTO transactions (token, userDestiny,ammount, accepted) VALUES ('"+token +"', '"+ userIdDestination +"',"+amount+", 'waitingAcceptance')");
+      queryDatabase("INSERT INTO transactions (token, userDestiny,ammount, accepted) VALUES ('"+token +"', '"+ userDest[0].userId +"',"+amount+", 'waitingAcceptance')");
       //var results= await queryDatabase("SELECT * FROM users");
     }
       res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -229,26 +337,37 @@ async function startPayment (req, res) {
   try{
     let receivedPost = await post.getPostObject(req);
     const TOKEN = receivedPost.transaction_token;
+    let sourceToken = receivedPost.sourceUToken;
     let RESULT = {};
     //let userIdOrigin = receivedPost.user_id; FUTURE IMPLEMENTATION
-    let resultQuery = await queryDatabase("SELECT * FROM transactions WHERE token='"+TOKEN+"';");
-
-    if(resultQuery.length==0){
-      message = "Transacció no trobada";
-      RESULT={"status":"Error","message":message}
-      /* Comprobar que el token no sea de una transaccion ya aceptada (y por tanto finalizada) */
-    }else if(resultQuery[0]["accepted"] != "waitingAcceptance"){
-      message = "Transacció repetida, no pot ser acceptada";
-      RESULT = {"status":"Error","message":message};
+    let sourceUser = await queryDatabase ("SELECT userId FROM users WHERE sessionToken='"+sourceToken+"';");
+    if(sourceUser.length!=0){
+      let resultQuery = await queryDatabase("SELECT * FROM transactions WHERE token='"+TOKEN+"';");
+      if(resultQuery.length==0){
+        message = "Transacció no trobada";
+        RESULT={"status":"Error","message":message}
+        /* Comprobar que el token no sea de una transaccion ya aceptada (y por tanto finalizada) */
+      }else if(resultQuery[0]["accepted"] != "waitingAcceptance"){
+        message = "Transacció repetida, no pot ser acceptada";
+        RESULT = {"status":"Error","message":message};
+      }else{
+        message = "Transaction done correctly";
+        RESULT={"status":"OK","message":message,"transaction_type":"Payment","amount":resultQuery[0]["ammount"]};
+      }
+      /* Necesitamos tener las fechas de setupPayment, startPayment y finishPayment para llevar un registro de cuanto tiempo
+      pasa entre cada parte de la transferencia */
+      queryDatabase("UPDATE transactions SET timeStart = NOW(), userOrigin = '"+sourceUser[0].userId+"' WHERE token ='"+ TOKEN +"';");
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(RESULT));
     }else{
-      message = "Transaction done correctly";
-      RESULT={"status":"OK","message":message,"transaction_type":"Payment","amount":resultQuery[0]["ammount"]};
+      message = "No s'ha trobat el usuari d'origen";
+      RESULT = {"status":"Error","message":message};
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(RESULT));
     }
-    /* Necesitamos tener las fechas de setupPayment, startPayment y finishPayment para llevar un registro de cuanto tiempo
-    pasa entre cada parte de la transferencia */
-    queryDatabase("UPDATE transactions SET timeStart = NOW() WHERE token ='"+ TOKEN +"';");
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(RESULT));
+    
+
+    
   }catch(e){
     console.log("ERROR: " + e.stack)
     RESULT = {"status":"Error","message":"Transacció no pot ser completada"};
@@ -261,53 +380,63 @@ app.post('/api/finish_payment', getPayment)
 async function getPayment (req, res) {
   try{
     let receivedPost = await post.getPostObject(req);
-    let userId = receivedPost.user_id;
+    let userToken = receivedPost.sourceUToken;
     let token = receivedPost.transaction_token;
     let accept = receivedPost.accept;
     let ammount = receivedPost.amount;
-
     let message;
     let balancePayer;
-    await queryDatabase("SET autocommit = 0;");
-    /* Primero si la variable accept enviada a traves del post, booleana, es true, significa que el
-    usuario que tiene que pagar da el OK a la transaccion */
-    if(accept){
-      balancePayer = await queryDatabase ("SELECT userBalance FROM users WHERE userId='"+userId+"';");
-      console.log(balancePayer[0].userBalance)
-      /*Comprobamos si el usuario tiene saldo suficiente para hacer la transferencia  */
-      if(ammount<=balancePayer[0].userBalance){
-        /* Registramos el resto de datos en la transferencia, 
-        ya sea que es aceptada, denegada pro falta de dinero o por el mismo usuario */
-        queryDatabase("UPDATE transactions SET userOrigin ="+ userId +", ammount ="+ ammount +", accepted = "+ "'acceptedByUser'"+ ", timeFinish = NOW() WHERE token ='"+ token+"';");
+    let balance;
+    let userId = await queryDatabase ("SELECT userId FROM users WHERE sessionToken='"+userToken+"';");
+    if(userId.length!=0){
+      userId=userId[0].userId;
+      await queryDatabase("SET autocommit = 0;");
+      /* Primero si la variable accept enviada a traves del post, booleana, es true, significa que el
+      usuario que tiene que pagar da el OK a la transaccion */
+      if(accept){
+        balancePayer = await queryDatabase ("SELECT userBalance FROM users WHERE userId='"+userId+"';");
+        console.log(balancePayer[0].userBalance)
+        /*Comprobamos si el usuario tiene saldo suficiente para hacer la transferencia  */
+        if(ammount<=balancePayer[0].userBalance){
+          /* Registramos el resto de datos en la transferencia, 
+          ya sea que es aceptada, denegada pro falta de dinero o por el mismo usuario */
+          queryDatabase("UPDATE transactions SET userOrigin ="+ userId +", ammount ="+ ammount +", accepted = "+ "'acceptedByUser'"+ ", timeFinish = NOW() WHERE token ='"+ token+"';");
 
-        /* Actualizamos el balance del usuario que paga */
-        queryDatabase("UPDATE users SET userBalance ="+ (balancePayer[0].userBalance-ammount) +" WHERE userId ='"+ userId+"';");
-        
-        /* Actualizamos el balance del usuario que recibe, primero debemos encontrar la id
-        del usuario receptor a partir del token de la transferencia y su saldo,
-        con esos datos lo actualizamos */
-        let userReceptorId = await queryDatabase ("SELECT userDestiny FROM transactions WHERE token='"+token+"';");
-        console.log("SELECT userBalance FROM users WHERE userId='"+userReceptorId[0].userDestiny+"';");
-        let balanceReceptor = await queryDatabase ("SELECT userBalance FROM users WHERE userId='"+userReceptorId[0].userDestiny+"';");
-        console.log(balanceReceptor);
-        queryDatabase("UPDATE users SET userBalance ="+ (balanceReceptor[0].userBalance+ammount) +" WHERE userId ='"+ userReceptorId[0].userDestiny+"';");
-        message = "Transacció aceptada";
-        console.log("si");
+          /* Actualizamos el balance del usuario que paga */
+          queryDatabase("UPDATE users SET userBalance ="+ (balancePayer[0].userBalance-ammount) +" WHERE userId ='"+ userId+"';");
+          
+          /* Actualizamos el balance del usuario que recibe, primero debemos encontrar la id
+          del usuario receptor a partir del token de la transferencia y su saldo,
+          con esos datos lo actualizamos */
+          let userReceptorId = await queryDatabase ("SELECT userDestiny FROM transactions WHERE token='"+token+"';");
+          console.log("SELECT userBalance FROM users WHERE userId='"+userReceptorId[0].userDestiny+"';");
+          let balanceReceptor = await queryDatabase ("SELECT userBalance FROM users WHERE userId='"+userReceptorId[0].userDestiny+"';");
+          console.log(balanceReceptor);
+          queryDatabase("UPDATE users SET userBalance ="+ (balanceReceptor[0].userBalance+ammount) +" WHERE userId ='"+ userReceptorId[0].userDestiny+"';");
+          message = "Transacció aceptada";
+          balance = balanceReceptor[0].userBalance + ammount;
+          console.log("si");
+        }else{
+          queryDatabase("UPDATE transactions SET userOrigin ="+ userId +", ammount ="+ ammount +", accepted = "+ "'insufficient balance'"+ ", timeFinish = NOW() WHERE token ='"+ token+"';");
+          message = "Transacció rebutjada, el usuari que está pagant no té suficient sou";
+        }
       }else{
-        queryDatabase("UPDATE transactions SET userOrigin ="+ userId +", ammount ="+ ammount +", accepted = "+ "'insufficient balance'"+ ", timeFinish = NOW() WHERE token ='"+ token+"';");
-        message = "Transacció rebutjada, el usuari que está pagant no té suficient sou";
+        queryDatabase("UPDATE transactions SET userOrigin ="+ userId +", ammount ="+ ammount +", accepted = "+ "'rejectedByUser'"+ ", timeFinish = NOW() WHERE token ='"+ token+"';");
+        message = "Transacció rebutjada per l'usuari";
       }
+      await queryDatabase("COMMIT;");
+      await queryDatabase("SET autocommit = 1;");
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({"status":"OK", "message":message, "balance":balance}));
     }else{
-      queryDatabase("UPDATE transactions SET userOrigin ="+ userId +", ammount ="+ ammount +", accepted = "+ "'rejectedByUser'"+ ", timeFinish = NOW() WHERE token ='"+ token+"';");
-      message = "Transacció reutjada per l'usuari";
+      message = "No s'ha trobat el usuari d'origen";
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({"status":"ERROR", "message":message}));
     }
-    await queryDatabase("COMMIT;");
-    await queryDatabase("SET autocommit = 1;");
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({"status":"OK", "message":message}));
 
 }catch(e){
   console.log("ERROR: " + e.stack)
+  await queryDatabase("SET autocommit = 1;");
 }
 }
 
@@ -318,13 +447,18 @@ function isValidNumber(number) {
     return false
   }
 }
-/* console.log(isValidNumber("135"));
-console.log(isValidNumber("45.678"));
-console.log(isValidNumber("12,34"));
-console.log(isValidNumber("errr"));
-console.log(isValidNumber("df.h"));
-console.log(isValidNumber("123.4.5")); */
-
+function generateToken(){
+  return new Promise(async (resolve, reject) => {
+    let token = "ST-"+uuidv4();
+    let checkToken = await queryDatabase ("SELECT userId FROM users WHERE sessionToken='"+token+"';");
+    if(checkToken.length==0){
+      resolve(token);
+    }else{
+      console.log("mismo");
+      resolve(generateToken());
+    }
+  });
+}
 function getDate(){
   var now = new Date();
   var formatedDate = now.getFullYear()+"/"+now.getMonth()+"/"+now.getDay()+" ";
@@ -349,15 +483,6 @@ function queryDatabase (query) {
       password: process.env.MYSQLPASSWORD || "j7YboDzy5yIdT6F8FRei",
       database: process.env.MYSQLDATABASE || "railway"
     });
-
-    /* Albert: Para hacer pruebas en local en mi PC */
-/*     var connection = mysql.createConnection({
-      host: process.env.MYSQLHOST || "localhost",
-      port: process.env.MYSQLPORT || 3306,
-      user: process.env.MYSQLUSER || "root",
-      password: process.env.MYSQLPASSWORD || "localhost",
-      database: process.env.MYSQLDATABASE || "ieticorn_database"
-    }); */
 
     connection.query(query, (error, results) => { 
       if (error) reject(error);
