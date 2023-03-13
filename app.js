@@ -139,7 +139,7 @@ async function signup (req, res) {
       se ha hecho o no sea mas sencillo que trabajar directamente con el mensaje */
     let receivedPost = await post.getPostObject(req);
     let message;
-    let token = "ST-" + uuidv4();
+    let token = await generateToken();
     let response={}
 
     let phone = receivedPost.userId;
@@ -188,7 +188,7 @@ async function signup (req, res) {
 app.post('/api/login',login)
 async function login (req, res) {
   let receivedPost = await post.getPostObject(req);
-  let token = "ST-"+uuidv4();
+  let token = await generateToken();
   let response={}
   // let password = receivedPost.password;
   let userSearch = await queryDatabase ("SELECT * FROM users WHERE userEmail='"+receivedPost.userEmail+"';");
@@ -442,7 +442,18 @@ function isValidNumber(number) {
     return false
   }
 }
-
+function generateToken(){
+  return new Promise(async (resolve, reject) => {
+    let token = "ST-"+uuidv4();
+    let checkToken = await queryDatabase ("SELECT userId FROM users WHERE sessionToken='"+token+"';");
+    if(checkToken.length==0){
+      resolve(token);
+    }else{
+      console.log("mismo");
+      resolve(generateToken());
+    }
+  });
+}
 function getDate(){
   var now = new Date();
   var formatedDate = now.getFullYear()+"/"+now.getMonth()+"/"+now.getDay()+" ";
