@@ -47,9 +47,13 @@ async function getProfiles (req, res) {
       filters+="GROUP BY userId HAVING COUNT(*) >= "+range[0]+" AND COUNT(*) <= "+range[1]+");"
     }
     if(filters!=""){
-      var results= await queryDatabase("SELECT * FROM users WHERE"+filters+";");
+      var results= await queryDatabase("SELECT id, userId, userPassword, userName, userSurname, \
+                                        userEmail, userBalance, userStatus, lastStatusChange,\
+                                        sessionToken, verificationStatus FROM users WHERE"+filters+";");
     }else{
-      var results= await queryDatabase("SELECT * FROM users;");
+      var results= await queryDatabase("SELECT id, userId, userPassword, userName, userSurname,\
+                                         userEmail, userBalance, userStatus, lastStatusChange,\
+                                          sessionToken, verificationStatus FROM users;");
     }
     res.end(JSON.stringify({"status":"OK","message":results}));
   }catch(e){
@@ -62,10 +66,18 @@ async function getProfiles (req, res) {
 app.post('/api/get_profile',getProfile)
 async function getProfile (req, res) {
   res.writeHead(200, { 'Content-Type': 'application/json' });
-
   let receivedPost = await post.getPostObject(req);
-  if((await queryDatabase("SELECT * FROM users WHERE sessionToken='" + receivedPost.sessionToken + "';")).length > 0){
-    var results = await queryDatabase("SELECT * FROM users WHERE sessionToken='" + receivedPost.sessionToken + "';");
+  let query;
+  if(receivedPost.returnDNI){
+    query = "SELECT *";
+  }else{
+    query = "SELECT id, userId, userPassword, userName, userSurname,\
+              userEmail, userBalance, userStatus, lastStatusChange,\
+              sessionToken, verificationStatus";
+  }
+  query+=" FROM users WHERE sessionToken='" + receivedPost.sessionToken + "';";
+  if((await queryDatabase(query)).length > 0){
+    var results = await queryDatabase(query);
     console.log(results);
     res.end(JSON.stringify({"status":"OK","message":results}));
   } else {
