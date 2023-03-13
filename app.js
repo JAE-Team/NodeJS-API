@@ -175,7 +175,7 @@ async function signup (req, res) {
       response["message"] = "Format incorrecte de correu";
       
     } else {
-      queryDatabase("INSERT INTO transactions (token, userDestiny, userOrigin,ammount, accepted) VALUES ('"+tokenPay +"', '"+ phone +"','CORNSERVICE',"+amount+", 'waitingAcceptance')");
+      queryDatabase("INSERT INTO transactions (token, userDestiny, userOrigin,ammount, accepted) VALUES ('"+tokenPay +"', '"+ phone +"','CORNSERVICE',"+balance+", 'waitingAcceptance')");
       queryDatabase("INSERT INTO users (userId, userPassword, userName, userSurname, userEmail, userBalance, sessionToken) VALUES ('"+phone+"','"+password+"', '"+name+"', '"+surname+"', '"+email+"', '"+balance+"', '"+token+"');");
       response["status"]="OK";
       response["message"] = "Usuari creat satisfactoriament";
