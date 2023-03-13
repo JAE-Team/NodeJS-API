@@ -55,7 +55,11 @@ async function getProfiles (req, res) {
                                          userEmail, userBalance, userStatus, lastStatusChange,\
                                           sessionToken, verificationStatus FROM users;");
     }
-    res.end(JSON.stringify({"status":"OK","message":results}));
+    if(results.length==0){
+      res.end(JSON.stringify({"status":"Error","message":"No s'ha trobat cap usuari"}));
+    }else{
+      res.end(JSON.stringify({"status":"OK","message":results}));
+    }
   }catch(e){
     console.log("ERROR: " + e.stack)
     res.end(JSON.stringify({"status":"Error","message":"Failed to get the profiles"}));
