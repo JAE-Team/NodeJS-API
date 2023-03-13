@@ -244,7 +244,7 @@ async function sendID (req, res) {
   if (receivedPost.type == "uploadFile") {
     await queryDatabase("UPDATE users SET anvers='" + anversDNI + "', revers='" + reversDNI + "', verificationStatus='WAITING_VERIFICATION' WHERE sessionToken='" + sessionToken + "';")
     response["status"] = "OK";
-    response["message"] = "Imatges pujades a la BDD";
+    response["message"] = "Imatges pujades satisfactoriament";
     response["statusDNI"] = "WAITING_VERIFICATION";
   } else {
     response["status"] = "KO";
