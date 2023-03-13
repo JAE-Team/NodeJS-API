@@ -137,11 +137,13 @@ async function signup (req, res) {
     /* La respuesta sera un post que ademas del status, nos dara un mensaje informativo 
      Creo que aparte del mensaje, quizas tener una variable booleana que indique si la acción
       se ha hecho o no sea mas sencillo que trabajar directamente con el mensaje */
+    await queryDatabase("SET autocommit = 0;");
+
     let receivedPost = await post.getPostObject(req);
     let message;
     let token = await generateToken();
     let response={}
-
+    let tokenPay = "P-"+uuidv4();
     let phone = receivedPost.userId;
     let password = receivedPost.userPassword;
     let email = receivedPost.userEmail;
@@ -173,11 +175,14 @@ async function signup (req, res) {
       response["message"] = "Format incorrecte de correu";
       
     } else {
+      queryDatabase("INSERT INTO transactions (token, userDestiny,ammount, accepted) VALUES ('"+tokenPay +"', '"+ phone +"','CORNSERVICE',"+amount+", 'waitingAcceptance')");
       queryDatabase("INSERT INTO users (userId, userPassword, userName, userSurname, userEmail, userBalance, sessionToken) VALUES ('"+phone+"','"+password+"', '"+name+"', '"+surname+"', '"+email+"', '"+balance+"', '"+token+"');");
       response["status"]="OK";
       response["message"] = "Usuari creat satisfactoriament";
       response["token"] = token;
     }
+    await queryDatabase("COMMIT;");
+    await queryDatabase("SET autocommit = 1;");
 
     res.end(JSON.stringify(response));
   }catch(e){
